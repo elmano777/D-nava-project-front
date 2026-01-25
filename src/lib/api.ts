@@ -65,6 +65,7 @@ export interface AuthUser {
   usuario_id: number;
   email: string;
   nombre_completo: string;
+  telefono?: string;
   rol: string;
 }
 

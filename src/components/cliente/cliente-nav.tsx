@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Package, LogOut, User } from "lucide-react";
+import { ShoppingBag, Package, LogOut, User, Search } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { clearAuthData, getStoredUser } from "@/lib/auth";
 import { AuthUser } from "@/lib/api";
-import { ShoppingCartDrawer } from "@/components/shopping-cart";
+import { ShoppingCartCliente } from "@/components/cliente/shopping-cart-cliente";
 
 export function ClienteNav() {
   const router = useRouter();
@@ -23,12 +23,17 @@ export function ClienteNav() {
     clearAuthData();
     document.cookie = "access_token=; path=/; max-age=0";
     document.cookie = "backend_user=; path=/; max-age=0";
-    router.push("/auth/login");
+    router.replace("/");
   };
 
   const navItems = [
     { href: "/cliente", label: "Productos", icon: ShoppingBag },
     { href: "/cliente/mis-pedidos", label: "Mis Pedidos", icon: Package },
+    {
+      href: "/cliente/consultar-pedido",
+      label: "Consultar Pedido",
+      icon: Search,
+    },
   ];
 
   return (
@@ -66,7 +71,7 @@ export function ClienteNav() {
           </div>
 
           <div className="flex items-center gap-3">
-            <ShoppingCartDrawer />
+            <ShoppingCartCliente />
 
             <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
               <User className="h-4 w-4" />

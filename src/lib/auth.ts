@@ -1,5 +1,30 @@
 import { AuthResponse, AuthUser } from "./api";
 
+// ====== JWT Payload Type ======
+export interface JwtPayload {
+  sub: number;
+  email: string;
+  rol: string;
+  nombre_completo: string;
+  telefono: string;
+  iat: number;
+  exp: number;
+}
+
+// ====== JWT Decode Helper ======
+export function decodeJwt(): JwtPayload | null {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  try {
+    const base64Payload = token.split(".")[1];
+    const payload = JSON.parse(atob(base64Payload));
+    return payload as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
 const TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "backend_user";

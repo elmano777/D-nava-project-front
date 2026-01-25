@@ -78,16 +78,7 @@ export function ContactSection() {
                 size="lg"
                 className="text-base px-8 py-6 h-auto w-full sm:w-auto gap-2"
                 asChild
-              >
-                <a
-                  href="https://wa.me/51987654321"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  Enviar mensaje por WhatsApp
-                </a>
-              </Button>
+              ></Button>
             </div>
           </div>
 

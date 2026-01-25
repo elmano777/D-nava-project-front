@@ -1,6 +1,10 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ShoppingCart } from "lucide-react";
+import { useState } from "react";
+import { useCartStore } from "@/store/cart-store";
 
 interface Product {
   id: string;
@@ -11,16 +15,34 @@ interface Product {
   stock: number;
 }
 
-interface ProductCardProps {
+interface ProductCardClienteProps {
   product: Product;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCardCliente({ product }: ProductCardClienteProps) {
+  const [isAdding, setIsAdding] = useState(false);
+  const addItem = useCartStore((state) => state.addItem);
+
   const formatPrice = (priceInCents: number) => {
     return new Intl.NumberFormat("es-PE", {
       style: "currency",
       currency: "PEN",
     }).format(priceInCents / 100);
+  };
+
+  const handleAddToCart = () => {
+    setIsAdding(true);
+
+    addItem({
+      id: product.id,
+      name: product.name,
+      price_in_cents: product.price_in_cents,
+      image_url: product.image_url,
+    });
+
+    setTimeout(() => {
+      setIsAdding(false);
+    }, 500);
   };
 
   return (
@@ -46,6 +68,16 @@ export function ProductCard({ product }: ProductCardProps) {
           {formatPrice(product.price_in_cents)}
         </p>
       </CardContent>
+      <CardFooter className="p-4 pt-0">
+        <Button
+          onClick={handleAddToCart}
+          disabled={product.stock === 0 || isAdding}
+          className="w-full"
+        >
+          <ShoppingCart className="mr-2 h-4 w-4" />
+          {isAdding ? "Agregado!" : "Agregar al Carrito"}
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

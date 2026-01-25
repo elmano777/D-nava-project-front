@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -61,8 +62,8 @@ export default function SignUpPage() {
       document.cookie = `access_token=${authResponse.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
       document.cookie = `backend_user=${encodeURIComponent(JSON.stringify(authResponse.user))}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
 
-      // Redirigir al home (usuarios nuevos son customers)
-      router.push("/");
+      // Redirigir al dashboard de cliente
+      router.push("/cliente");
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error al registrarse";
@@ -75,6 +76,12 @@ export default function SignUpPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center p-6">
       <div className="w-full max-w-sm">
+        <Button asChild variant="ghost" size="sm" className="mb-4">
+          <Link href="/">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al inicio
+          </Link>
+        </Button>
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Crear Cuenta</CardTitle>

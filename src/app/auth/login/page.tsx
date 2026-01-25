@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -61,6 +62,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center p-6">
       <div className="w-full max-w-sm">
+        <Button asChild variant="ghost" size="sm" className="mb-4">
+          <Link href="/">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al inicio
+          </Link>
+        </Button>
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>

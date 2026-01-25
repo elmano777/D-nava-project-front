@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   Tags,
+  Search,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { clearAuthData } from "@/lib/auth";
@@ -26,7 +27,7 @@ export function AdminNav() {
     document.cookie = "access_token=; path=/; max-age=0";
     document.cookie = "backend_user=; path=/; max-age=0";
 
-    router.push("/auth/login");
+    router.replace("/");
   };
 
   const navItems = [
@@ -34,6 +35,7 @@ export function AdminNav() {
     { href: "/admin/products", label: "Productos", icon: Package },
     { href: "/admin/categories", label: "Categorías", icon: Tags },
     { href: "/admin/orders", label: "Pedidos", icon: ShoppingCart },
+    { href: "/admin/consultar-pedido", label: "Buscar Pedido", icon: Search },
     { href: "/admin/reports", label: "Reportes", icon: BarChart3 },
   ];
 

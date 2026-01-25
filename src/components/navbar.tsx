@@ -47,12 +47,6 @@ export function Navbar() {
               Productos
             </Link>
             <Link
-              href="/consultar-pedido"
-              className="text-foreground hover:text-primary transition-colors font-medium px-4 py-2 rounded-lg hover:bg-muted/50"
-            >
-              Rastrear Pedido
-            </Link>
-            <Link
               href="/#nosotros"
               className="text-foreground hover:text-primary transition-colors font-medium px-4 py-2 rounded-lg hover:bg-muted/50"
             >
@@ -112,12 +106,6 @@ export function Navbar() {
               className="block px-4 py-2 text-foreground hover:bg-muted rounded-md transition-colors font-medium"
             >
               Productos
-            </Link>
-            <Link
-              href="/consultar-pedido"
-              className="block px-4 py-2 text-foreground hover:bg-muted rounded-md transition-colors font-medium"
-            >
-              Rastrear Pedido
             </Link>
             <Link
               href="/#nosotros"
