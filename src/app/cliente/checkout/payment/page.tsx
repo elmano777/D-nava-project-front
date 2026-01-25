@@ -7,12 +7,18 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createPaymentPreferenceApi } from "@/lib/api";
+import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
+
+// Inicializar Mercado Pago con la Public Key
+initMercadoPago(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY || "", {
+  locale: "es-PE",
+});
 
 export default function PaymentPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [initPoint, setInitPoint] = useState<string | null>(null);
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
 
   const fetchPreference = useCallback(async () => {
     try {
@@ -43,13 +49,13 @@ export default function PaymentPage() {
 
       const result = await createPaymentPreferenceApi(pedidoId);
 
-      setInitPoint(result.initPoint || result.sandboxInitPoint || null);
+      setPreferenceId(result.preferenceId);
 
-      return result.initPoint;
+      return result.preferenceId;
     } catch (error) {
       console.error("Error creando preferencia de Mercado Pago:", error);
       setError(
-        "Error al iniciar el pago con Mercado Pago. Por favor intenta nuevamente."
+        "Error al iniciar el pago con Mercado Pago. Por favor intenta nuevamente.",
       );
       return null;
     } finally {
@@ -92,7 +98,7 @@ export default function PaymentPage() {
           <div className="mb-8">
             <h1 className="text-3xl md:text-4xl font-bold mb-2">Pago Seguro</h1>
             <p className="text-muted-foreground">
-              Serás redirigido a Mercado Pago para completar tu pago.
+              Completa tu pago con Mercado Pago de forma segura.
             </p>
           </div>
 
@@ -105,19 +111,13 @@ export default function PaymentPage() {
                 <div className="flex flex-col items-center justify-center gap-4">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="text-muted-foreground">
-                    Creando preferencia de pago en Mercado Pago...
+                    Preparando opciones de pago...
                   </p>
                 </div>
-              ) : initPoint ? (
-                <Button
-                  size="lg"
-                  className="w-full max-w-sm"
-                  onClick={() => {
-                    window.location.href = initPoint;
-                  }}
-                >
-                  Ir a pagar con Mercado Pago
-                </Button>
+              ) : preferenceId ? (
+                <div className="w-full max-w-sm">
+                  <Wallet initialization={{ preferenceId }} />
+                </div>
               ) : (
                 <div className="text-center space-y-4">
                   <p className="text-red-500">
