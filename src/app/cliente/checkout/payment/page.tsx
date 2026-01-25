@@ -10,9 +10,7 @@ import { createPaymentPreferenceApi } from "@/lib/api";
 import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
 
 // Inicializar Mercado Pago con la Public Key
-initMercadoPago(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY || "", {
-  locale: "es-PE",
-});
+initMercadoPago(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY || "");
 
 export default function PaymentPage() {
   const router = useRouter();
