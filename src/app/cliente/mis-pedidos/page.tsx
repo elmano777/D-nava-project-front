@@ -11,7 +11,10 @@ import Link from "next/link";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   recibido: { label: "Recibido", color: "bg-yellow-100 text-yellow-800" },
-  en_preparacion: { label: "En Preparación", color: "bg-blue-100 text-blue-800" },
+  en_preparacion: {
+    label: "En Preparación",
+    color: "bg-blue-100 text-blue-800",
+  },
   listo: { label: "Listo", color: "bg-green-100 text-green-800" },
   completado: { label: "Completado", color: "bg-green-100 text-green-800" },
   cancelado: { label: "Cancelado", color: "bg-red-100 text-red-800" },
@@ -86,7 +89,9 @@ export default function MisPedidosPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-20">
               <Package className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No tienes pedidos aún</h3>
+              <h3 className="text-xl font-semibold mb-2">
+                No tienes pedidos aún
+              </h3>
               <p className="text-muted-foreground mb-4">
                 ¡Haz tu primer pedido hoy!
               </p>
@@ -98,8 +103,11 @@ export default function MisPedidosPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => {
-              const status = statusConfig[order.estado_pedido] || statusConfig.recibido;
-              const paymentStatus = paymentStatusConfig[order.estado_pago] || paymentStatusConfig.pendiente;
+              const status =
+                statusConfig[order.estado_pedido] || statusConfig.recibido;
+              const paymentStatus =
+                paymentStatusConfig[order.estado_pago] ||
+                paymentStatusConfig.pendiente;
 
               return (
                 <Card key={order.pedido_id}>
@@ -117,7 +125,10 @@ export default function MisPedidosPage() {
                         <Badge className={status.color} variant="secondary">
                           {status.label}
                         </Badge>
-                        <Badge className={paymentStatus.color} variant="secondary">
+                        <Badge
+                          className={paymentStatus.color}
+                          variant="secondary"
+                        >
                           Pago: {paymentStatus.label}
                         </Badge>
                       </div>
@@ -127,7 +138,7 @@ export default function MisPedidosPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">
-                          {order.items?.length || 0} producto(s)
+                          Tipo: {order.tipo_entrega.replace("_", " ")}
                         </p>
                         <p className="text-lg font-bold text-primary">
                           {formatPrice(order.total)}

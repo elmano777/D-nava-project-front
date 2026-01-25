@@ -7,16 +7,50 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Package, Clock, CheckCircle2, XCircle, Loader2, ArrowLeft } from "lucide-react";
-import { getOrderApi, OrderDto } from "@/lib/api";
+import {
+  Package,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  ArrowLeft,
+} from "lucide-react";
+import { getOrderWithDetailsApi, OrderDto, OrderDetailDto } from "@/lib/api";
+
+type OrderWithDetails = OrderDto & {
+  detalles: OrderDetailDto[];
+};
 import Link from "next/link";
 
-const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string }> = {
-  recibido: { label: "Recibido", icon: Clock, color: "bg-yellow-100 text-yellow-800" },
-  en_preparacion: { label: "En Preparación", icon: Package, color: "bg-blue-100 text-blue-800" },
-  listo: { label: "Listo para Recoger", icon: CheckCircle2, color: "bg-green-100 text-green-800" },
-  completado: { label: "Completado", icon: CheckCircle2, color: "bg-green-100 text-green-800" },
-  cancelado: { label: "Cancelado", icon: XCircle, color: "bg-red-100 text-red-800" },
+const statusConfig: Record<
+  string,
+  { label: string; icon: typeof Clock; color: string }
+> = {
+  recibido: {
+    label: "Recibido",
+    icon: Clock,
+    color: "bg-yellow-100 text-yellow-800",
+  },
+  en_preparacion: {
+    label: "En Preparación",
+    icon: Package,
+    color: "bg-blue-100 text-blue-800",
+  },
+  listo: {
+    label: "Listo para Recoger",
+    icon: CheckCircle2,
+    color: "bg-green-100 text-green-800",
+  },
+  completado: {
+    label: "Completado",
+    icon: CheckCircle2,
+    color: "bg-green-100 text-green-800",
+  },
+  cancelado: {
+    label: "Cancelado",
+    icon: XCircle,
+    color: "bg-red-100 text-red-800",
+  },
 };
 
 const paymentStatusConfig: Record<string, { label: string; color: string }> = {
@@ -30,7 +64,7 @@ export default function PedidoDetallePage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [order, setOrder] = useState<OrderDto | null>(null);
+  const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +76,7 @@ export default function PedidoDetallePage() {
           setError("ID de pedido inválido");
           return;
         }
-        const orderData = await getOrderApi(pedidoId);
+        const orderData = await getOrderWithDetailsApi(pedidoId);
         setOrder(orderData);
       } catch (err) {
         console.error("Error cargando pedido:", err);
@@ -104,7 +138,8 @@ export default function PedidoDetallePage() {
   }
 
   const statusInfo = statusConfig[order.estado_pedido] || statusConfig.recibido;
-  const paymentInfo = paymentStatusConfig[order.estado_pago] || paymentStatusConfig.pendiente;
+  const paymentInfo =
+    paymentStatusConfig[order.estado_pago] || paymentStatusConfig.pendiente;
   const StatusIcon = statusInfo.icon;
 
   return (
@@ -134,22 +169,34 @@ export default function PedidoDetallePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-3">
-                <Badge className={`${statusInfo.color} px-4 py-2 text-sm font-semibold`} variant="secondary">
+                <Badge
+                  className={`${statusInfo.color} px-4 py-2 text-sm font-semibold`}
+                  variant="secondary"
+                >
                   {statusInfo.label}
                 </Badge>
-                <Badge className={`${paymentInfo.color} px-4 py-2 text-sm font-semibold`} variant="secondary">
+                <Badge
+                  className={`${paymentInfo.color} px-4 py-2 text-sm font-semibold`}
+                  variant="secondary"
+                >
                   Pago: {paymentInfo.label}
                 </Badge>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4 pt-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Fecha del Pedido</p>
-                  <p className="font-medium">{formatDate(order.fecha_creacion)}</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Fecha del Pedido
+                  </p>
+                  <p className="font-medium">
+                    {formatDate(order.fecha_creacion)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Total</p>
-                  <p className="font-bold text-lg text-primary">{formatPrice(order.total)}</p>
+                  <p className="font-bold text-lg text-primary">
+                    {formatPrice(order.total)}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -162,21 +209,28 @@ export default function PedidoDetallePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items?.map((item) => (
-                  <div key={item.detalle_id} className="flex justify-between items-center py-2">
+                {order.detalles?.map((item) => (
+                  <div
+                    key={item.detalle_id}
+                    className="flex justify-between items-center py-2"
+                  >
                     <div>
                       <p className="font-medium">{item.nombre_producto}</p>
                       <p className="text-sm text-muted-foreground">
                         {item.cantidad} x {formatPrice(item.precio_unitario)}
                       </p>
                     </div>
-                    <p className="font-semibold">{formatPrice(item.subtotal)}</p>
+                    <p className="font-semibold">
+                      {formatPrice(item.subtotal)}
+                    </p>
                   </div>
                 ))}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-primary">{formatPrice(order.total)}</span>
+                  <span className="text-primary">
+                    {formatPrice(order.total)}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -190,7 +244,9 @@ export default function PedidoDetallePage() {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm text-muted-foreground">Tipo de Entrega</p>
-                <p className="font-medium capitalize">{order.tipo_entrega.replace("_", " ")}</p>
+                <p className="font-medium capitalize">
+                  {order.tipo_entrega.replace("_", " ")}
+                </p>
               </div>
               {order.direccion_entrega && (
                 <div>

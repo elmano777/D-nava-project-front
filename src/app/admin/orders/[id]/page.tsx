@@ -28,8 +28,27 @@ import {
   CreditCard,
   Truck,
 } from "lucide-react";
-import { getOrderApi, updateOrderStatusApi, OrderDto } from "@/lib/api";
+import {
+  getOrderWithDetailsApi,
+  updateOrderStatusApi,
+  OrderDto,
+  OrderDetailDto,
+  OrderEstadoPedido,
+} from "@/lib/api";
 import Link from "next/link";
+
+interface OrderHistorialDto {
+  historial_id: number;
+  estado_anterior: string | null;
+  estado_nuevo: string;
+  notas: string | null;
+  fecha_cambio: string;
+}
+
+type OrderWithDetails = OrderDto & {
+  detalles: OrderDetailDto[];
+  historial?: OrderHistorialDto[];
+};
 
 const statusConfig: Record<
   string,
@@ -73,7 +92,7 @@ export default function AdminOrderDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [order, setOrder] = useState<OrderDto | null>(null);
+  const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -86,7 +105,7 @@ export default function AdminOrderDetailPage() {
           setError("ID de pedido inválido");
           return;
         }
-        const orderData = await getOrderApi(pedidoId);
+        const orderData = await getOrderWithDetailsApi(pedidoId);
         setOrder(orderData);
       } catch (err) {
         console.error("Error cargando pedido:", err);
@@ -104,8 +123,10 @@ export default function AdminOrderDetailPage() {
 
     setIsUpdating(true);
     try {
-      const updated = await updateOrderStatusApi(order.pedido_id, newStatus);
-      setOrder(updated);
+      const updated = await updateOrderStatusApi(order.pedido_id, {
+        estado_pedido: newStatus as OrderEstadoPedido,
+      });
+      setOrder({ ...order, ...updated });
     } catch (err) {
       console.error("Error actualizando estado:", err);
     } finally {
@@ -212,12 +233,12 @@ export default function AdminOrderDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5" />
-                    Productos ({order.items?.length || 0})
+                    Productos ({order.detalles?.length || 0})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {order.items?.map((item) => (
+                    {order.detalles?.map((item) => (
                       <div
                         key={item.detalle_id}
                         className="flex justify-between items-center py-3 border-b last:border-0"
@@ -225,11 +246,12 @@ export default function AdminOrderDetailPage() {
                         <div className="flex-1">
                           <p className="font-medium">{item.nombre_producto}</p>
                           <p className="text-sm text-muted-foreground">
-                            {item.cantidad} x {formatPrice(item.precio_unitario)}
+                            {item.cantidad} x{" "}
+                            {formatPrice(item.precio_unitario)}
                           </p>
                           {item.personalizacion && (
                             <p className="text-sm text-muted-foreground italic">
-                              {item.personalizacion}
+                              {JSON.stringify(item.personalizacion)}
                             </p>
                           )}
                         </div>
@@ -395,7 +417,9 @@ export default function AdminOrderDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Método de pago</span>
+                    <span className="text-muted-foreground">
+                      Método de pago
+                    </span>
                     <span className="capitalize">{order.metodo_pago}</span>
                   </div>
                   <div className="flex justify-between">
