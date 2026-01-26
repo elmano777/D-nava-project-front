@@ -216,13 +216,18 @@ export default function PaymentPage() {
   const handleOpenCulqi = () => {
     if (!window.Culqi || !orderData) return;
 
+    // Process RSA key - replace literal \n with actual newlines
+    const rsaPublicKey = (
+      process.env.NEXT_PUBLIC_CULQI_RSA_PUBLIC_KEY || ""
+    ).replace(/\\n/g, "\n");
+
     // Configure Culqi settings
     window.Culqi.settings({
       title: "Pana",
       currency: "PEN",
       amount: Math.round(orderData.total * 100), // Culqi expects amount in cents
       xculqirsaid: process.env.NEXT_PUBLIC_CULQI_RSA_ID,
-      rsapublickey: process.env.NEXT_PUBLIC_CULQI_RSA_PUBLIC_KEY,
+      rsapublickey: rsaPublicKey,
     });
 
     // Configure Culqi options
