@@ -95,36 +95,25 @@ export async function registerApi(payload: {
   });
 }
 
-// ====== Payments ======
+// ====== Payments (Culqi) ======
 
-export interface CreatePreferenceResponse {
-  preferenceId: string;
-  initPoint: string;
-  sandboxInitPoint?: string | null;
-}
-
-export async function createPaymentPreferenceApi(pedidoId: number) {
-  return apiFetch<CreatePreferenceResponse>("/payments/create-preference", {
-    method: "POST",
-    auth: true,
-    body: JSON.stringify({ pedido_id: pedidoId }),
-  });
-}
-
-export interface CreateYapePaymentPayload {
+export interface CulqiChargePayload {
   pedido_id: number;
-  token: string;
+  token_id: string;
   email: string;
 }
 
-export interface CreateYapePaymentResponse {
-  paymentId: number;
+export interface CulqiChargeResponse {
+  charge_id: string;
   status: string;
-  statusDetail?: string;
+  status_detail?: string;
+  amount: number;
+  currency: string;
 }
 
-export async function createYapePaymentApi(payload: CreateYapePaymentPayload) {
-  return apiFetch<CreateYapePaymentResponse>("/payments/create-yape-payment", {
+// TODO: Habilitar cuando el backend esté listo
+export async function createCulqiChargeApi(payload: CulqiChargePayload) {
+  return apiFetch<CulqiChargeResponse>("/payments/culqi/charge", {
     method: "POST",
     auth: true,
     body: JSON.stringify(payload),
@@ -134,8 +123,7 @@ export async function createYapePaymentApi(payload: CreateYapePaymentPayload) {
 export interface PaymentStatusResponse {
   transaccion_id: number;
   pedido_id: number;
-  mercadopago_payment_id: string;
-  mercadopago_preference_id: string;
+  culqi_charge_id?: string;
   estado: string;
   metodo_pago: string | null;
   monto: string;
@@ -147,6 +135,23 @@ export async function getPaymentStatusApi(pedidoId: number) {
   return apiFetch<PaymentStatusResponse>(`/payments/${pedidoId}/status`, {
     method: "GET",
     auth: true,
+  });
+}
+
+// ====== Legacy Mercado Pago (deprecated) ======
+
+export interface CreatePreferenceResponse {
+  preferenceId: string;
+  initPoint: string;
+  sandboxInitPoint?: string | null;
+}
+
+// @deprecated - Usar createCulqiChargeApi en su lugar
+export async function createPaymentPreferenceApi(pedidoId: number) {
+  return apiFetch<CreatePreferenceResponse>("/payments/create-preference", {
+    method: "POST",
+    auth: true,
+    body: JSON.stringify({ pedido_id: pedidoId }),
   });
 }
 

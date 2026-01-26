@@ -1,37 +1,109 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
-import { createPaymentPreferenceApi } from "@/lib/api";
+import { Loader2, CreditCard, CheckCircle } from "lucide-react";
 
-interface CartItem {
-  id: string;
-  name: string;
-  price_in_cents: number;
-  quantity: number;
-  image_url: string;
+// Extend Window interface for Culqi
+declare global {
+  interface Window {
+    Culqi?: {
+      publicKey: string;
+      settings: (config: CulqiSettings) => void;
+      options: (config: CulqiOptions) => void;
+      open: () => void;
+      close: () => void;
+      token?: CulqiToken;
+      order?: CulqiOrder;
+      error?: CulqiError;
+    };
+    culqi?: () => void;
+  }
 }
 
-interface CustomerData {
-  name: string;
+interface CulqiSettings {
+  title: string;
+  currency: string;
+  amount: number;
+  order?: string;
+  xculqirsaid?: string;
+  rsapublickey?: string;
+}
+
+interface CulqiOptions {
+  lang?: string;
+  installments?: boolean;
+  paymentMethods?: {
+    tarjeta?: boolean;
+    yape?: boolean;
+    bancaMovil?: boolean;
+    agente?: boolean;
+    billetera?: boolean;
+    cuotealo?: boolean;
+  };
+  style?: {
+    logo?: string;
+    bannerColor?: string;
+    buttonBackground?: string;
+    menuColor?: string;
+    linksColor?: string;
+    buttonText?: string;
+    buttonTextColor?: string;
+    priceColor?: string;
+  };
+}
+
+interface CulqiToken {
+  id: string;
+  type: string;
   email: string;
-  phone: string;
-  address: string;
-  city: string;
+  card_number: string;
+  last_four: string;
+  active: boolean;
+  iin: {
+    bin: string;
+    card_brand: string;
+    card_type: string;
+    card_category: string;
+    issuer: {
+      name: string;
+      country: string;
+      country_code: string;
+      website: string;
+      phone_number: string;
+    };
+  };
+}
+
+interface CulqiOrder {
+  id: string;
+}
+
+interface CulqiError {
+  merchant_message: string;
+  user_message: string;
+  type: string;
 }
 
 export default function PaymentPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [initPoint, setInitPoint] = useState<string | null>(null);
+  const [orderData, setOrderData] = useState<{
+    pedidoId: number;
+    total: number;
+    numeroOrden: string;
+  } | null>(null);
+  const [culqiReady, setCulqiReady] = useState(false);
+  const [tokenGenerated, setTokenGenerated] = useState<CulqiToken | null>(null);
+  const culqiScriptLoaded = useRef(false);
 
-  const fetchPreference = useCallback(async () => {
+  // Load order data from localStorage
+  const fetchOrderData = useCallback(async () => {
     try {
       const pendingOrderStr = localStorage.getItem("pendingOrder");
 
@@ -43,11 +115,11 @@ export default function PaymentPage() {
       const pendingOrder = JSON.parse(pendingOrderStr) as {
         pedidoId?: number;
         numeroOrden?: string;
-        orderId?: string | number; // compatibilidad con versión antigua
+        total?: number;
+        orderId?: string | number;
         orderNumber?: string;
       };
 
-      // Intentar usar primero el campo nuevo (pedidoId), si no existe, caer al antiguo orderId
       const rawId =
         typeof pendingOrder.pedidoId === "number" &&
         !Number.isNaN(pendingOrder.pedidoId)
@@ -56,18 +128,29 @@ export default function PaymentPage() {
 
       const pedidoId = Number(rawId);
       if (!pedidoId || Number.isNaN(pedidoId)) {
-        throw new Error("ID de pedido inválido para Mercado Pago");
+        throw new Error("ID de pedido inválido");
       }
 
-      const result = await createPaymentPreferenceApi(pedidoId);
+      // For public checkout, we need the total from localStorage since we can't call authenticated API
+      const total = pendingOrder.total || 0;
+      const numeroOrden =
+        pendingOrder.numeroOrden || pendingOrder.orderNumber || "";
 
-      setInitPoint(result.initPoint || result.sandboxInitPoint || null);
+      if (!total) {
+        throw new Error("Total del pedido no disponible");
+      }
 
-      return result.initPoint;
-    } catch (error) {
-      console.error("Error creando preferencia de Mercado Pago:", error);
+      setOrderData({
+        pedidoId,
+        total,
+        numeroOrden,
+      });
+
+      return { pedidoId, total, numeroOrden };
+    } catch (err) {
+      console.error("Error obteniendo datos del pedido:", err);
       setError(
-        "Error al iniciar el pago con Mercado Pago. Por favor intenta nuevamente.",
+        "Error al obtener los datos del pedido. Por favor intenta nuevamente.",
       );
       return null;
     } finally {
@@ -75,11 +158,98 @@ export default function PaymentPage() {
     }
   }, [router]);
 
+  // Load Culqi script
   useEffect(() => {
-    fetchPreference().catch(() => {});
-  }, [fetchPreference]);
+    if (culqiScriptLoaded.current) return;
 
-  if (error) {
+    const script = document.createElement("script");
+    script.src = "https://checkout.culqi.com/js/v4";
+    script.async = true;
+    script.onload = () => {
+      culqiScriptLoaded.current = true;
+      if (window.Culqi) {
+        window.Culqi.publicKey = process.env.NEXT_PUBLIC_CULQI_PUBLIC_KEY || "";
+        setCulqiReady(true);
+      }
+    };
+    script.onerror = () => {
+      setError(
+        "Error al cargar el sistema de pagos. Por favor recarga la página.",
+      );
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, []);
+
+  // Setup Culqi callback
+  useEffect(() => {
+    window.culqi = () => {
+      if (window.Culqi?.token) {
+        const token = window.Culqi.token;
+        console.log("Token Culqi generado:", token);
+        setTokenGenerated(token);
+
+        // TODO: Cuando el backend esté listo, enviar el token aquí
+      } else if (window.Culqi?.order) {
+        console.log("Order Culqi:", window.Culqi.order);
+      } else if (window.Culqi?.error) {
+        console.error("Error Culqi:", window.Culqi.error);
+        setError(
+          window.Culqi.error.user_message || "Error al procesar el pago",
+        );
+      }
+    };
+
+    return () => {
+      window.culqi = undefined;
+    };
+  }, []);
+
+  // Fetch order data on mount
+  useEffect(() => {
+    fetchOrderData();
+  }, [fetchOrderData]);
+
+  const handleOpenCulqi = () => {
+    if (!window.Culqi || !orderData) return;
+
+    // Configure Culqi settings
+    window.Culqi.settings({
+      title: "Pana",
+      currency: "PEN",
+      amount: Math.round(orderData.total * 100), // Culqi expects amount in cents
+      xculqirsaid: process.env.NEXT_PUBLIC_CULQI_RSA_ID,
+      rsapublickey: process.env.NEXT_PUBLIC_CULQI_RSA_PUBLIC_KEY,
+    });
+
+    // Configure Culqi options
+    window.Culqi.options({
+      lang: "es",
+      installments: false,
+      paymentMethods: {
+        tarjeta: true,
+        yape: true,
+        bancaMovil: false,
+        agente: false,
+        billetera: false,
+        cuotealo: false,
+      },
+      style: {
+        bannerColor: "#000000",
+        buttonBackground: "#000000",
+        buttonText: "Pagar",
+        buttonTextColor: "#FFFFFF",
+      },
+    });
+
+    // Open Culqi checkout
+    window.Culqi.open();
+  };
+
+  if (error && !tokenGenerated) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -89,8 +259,70 @@ export default function PaymentPage() {
               <CardHeader>
                 <CardTitle>Error</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <p className="text-red-500">{error}</p>
+                <Button onClick={() => router.push("/checkout")}>
+                  Volver al checkout
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show success state when token is generated
+  if (tokenGenerated) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12">
+          <div className="max-w-3xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-6 w-6 text-green-500" />
+                  Token Generado Exitosamente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-green-800 font-medium mb-2">
+                    El checkout de Culqi funciona correctamente.
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Token ID:{" "}
+                    <code className="bg-green-100 px-1 rounded">
+                      {tokenGenerated.id}
+                    </code>
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Tarjeta: {tokenGenerated.iin?.card_brand} ****{" "}
+                    {tokenGenerated.last_four}
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-yellow-800 text-sm">
+                    <strong>Nota:</strong> El backend aún no está configurado
+                    para procesar pagos con Culqi. Cuando esté listo, este token
+                    se enviará automáticamente para completar el cargo.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={() => router.push("/")}>
+                    Volver al inicio
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setTokenGenerated(null)}
+                  >
+                    Probar de nuevo
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -108,7 +340,7 @@ export default function PaymentPage() {
           <div className="mb-8">
             <h1 className="text-3xl md:text-4xl font-bold mb-2">Pago Seguro</h1>
             <p className="text-muted-foreground">
-              Serás redirigido a Mercado Pago para completar tu pago.
+              Completa tu pago de forma segura con Culqi.
             </p>
           </div>
 
@@ -117,28 +349,51 @@ export default function PaymentPage() {
               <CardTitle>Métodos de Pago</CardTitle>
             </CardHeader>
             <CardContent className="min-h-[200px] flex flex-col items-center justify-center gap-4">
-              {isLoading ? (
+              {isLoading || !culqiReady ? (
                 <div className="flex flex-col items-center justify-center gap-4">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="text-muted-foreground">
-                    Creando preferencia de pago en Mercado Pago...
+                    Preparando opciones de pago...
                   </p>
                 </div>
-              ) : initPoint ? (
-                <Button
-                  size="lg"
-                  className="w-full max-w-sm"
-                  onClick={() => {
-                    window.location.href = initPoint;
-                  }}
-                >
-                  Ir a pagar con Mercado Pago
-                </Button>
+              ) : orderData ? (
+                <div className="w-full max-w-sm space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Total a pagar
+                    </p>
+                    <p className="text-3xl font-bold">
+                      S/ {orderData.total.toFixed(2)}
+                    </p>
+                    {orderData.numeroOrden && (
+                      <p className="text-xs text-muted-foreground">
+                        Orden: {orderData.numeroOrden}
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={handleOpenCulqi}
+                  >
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Pagar con Culqi
+                  </Button>
+
+                  <p className="text-xs text-center text-muted-foreground">
+                    Aceptamos tarjetas de crédito, débito y Yape
+                  </p>
+                </div>
               ) : (
-                <p className="text-red-500 text-center">
-                  No se pudo inicializar el pago. Por favor vuelve al checkout e
-                  inténtalo nuevamente.
-                </p>
+                <div className="text-center space-y-4">
+                  <p className="text-red-500">
+                    No se pudo obtener la información del pedido.
+                  </p>
+                  <Button onClick={() => router.push("/checkout")}>
+                    Volver al checkout
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
