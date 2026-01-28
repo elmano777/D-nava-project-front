@@ -35,6 +35,14 @@ export default function LoginPage() {
       // Login en backend NestJS
       const authResponse = await loginApi(email, password);
 
+      // Validar que la respuesta tenga la estructura esperada
+      if (!authResponse.user) {
+        console.error("Respuesta del login:", authResponse);
+        throw new Error(
+          "Respuesta del servidor inválida: falta información del usuario",
+        );
+      }
+
       // Guardar tokens y datos del usuario en localStorage
       saveAuthData(authResponse);
 

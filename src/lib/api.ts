@@ -97,21 +97,39 @@ export async function registerApi(payload: {
 
 // ====== Payments (Culqi) ======
 
+// ====== Culqi ======
+
+export interface CulqiOrderResponse {
+  order_id: string;
+  amount: number;
+  currency_code: string;
+  state: string;
+  qr?: string;
+  payment_code?: string;
+}
+
+export async function createCulqiOrderApi(pedidoId: number) {
+  return apiFetch<CulqiOrderResponse>("/payments/culqi/order", {
+    method: "POST",
+    auth: true,
+    body: JSON.stringify({ pedido_id: pedidoId }),
+  });
+}
+
 export interface CulqiChargePayload {
   pedido_id: number;
-  token_id: string;
+  source_id: string;
   email: string;
 }
 
 export interface CulqiChargeResponse {
   charge_id: string;
-  status: string;
-  status_detail?: string;
+  outcome_type: string;
+  user_message: string;
   amount: number;
   currency: string;
 }
 
-// TODO: Habilitar cuando el backend esté listo
 export async function createCulqiChargeApi(payload: CulqiChargePayload) {
   return apiFetch<CulqiChargeResponse>("/payments/culqi/charge", {
     method: "POST",

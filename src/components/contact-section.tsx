@@ -5,19 +5,20 @@ const contactInfo = [
   {
     icon: Phone,
     label: "Teléfono",
-    value: "+51 987 654 321",
-    link: "tel:+51987654321",
+    value: "+51 940 241 024",
+    link: "tel:+51940241024",
   },
   {
     icon: Mail,
     label: "Email",
-    value: "contacto@dnava.pe",
-    link: "mailto:contacto@dnava.pe",
+    value: "dnavapasteleria@gmail.com",
+    link: "mailto:dnavapasteleria@gmail.com",
   },
   {
     icon: MapPin,
     label: "Ubicación",
-    value: "San Isidro, Lima, Perú",
+    value:
+      "Av. Jorge Díaz Velásquez S/N, Mz. G Lt. 2A, Piso 1, Dpto. 1, AA.HH. UPIS San José – Lurín, Lima",
   },
 ];
 

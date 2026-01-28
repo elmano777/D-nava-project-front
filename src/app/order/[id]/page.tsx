@@ -47,6 +47,10 @@ const paymentStatusConfig = {
     label: "Pagado",
     color: "bg-green-100 text-green-800",
   },
+  completado: {
+    label: "Completado",
+    color: "bg-green-100 text-green-800",
+  },
   procesando: {
     label: "Procesando",
     color: "bg-blue-100 text-blue-800",

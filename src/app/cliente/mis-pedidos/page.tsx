@@ -23,6 +23,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 const paymentStatusConfig: Record<string, { label: string; color: string }> = {
   pendiente: { label: "Pendiente", color: "bg-yellow-100 text-yellow-800" },
   pagado: { label: "Pagado", color: "bg-green-100 text-green-800" },
+  completado: { label: "Completado", color: "bg-green-100 text-green-800" },
   procesando: { label: "Procesando", color: "bg-blue-100 text-blue-800" },
   rechazado: { label: "Rechazado", color: "bg-red-100 text-red-800" },
 };
