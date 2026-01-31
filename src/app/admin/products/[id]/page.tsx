@@ -31,7 +31,10 @@ import {
   listCategoriesApi,
   CategoryDto,
   CreateProductPayload,
+  ProductWithImagesDto,
 } from "@/lib/api";
+import { ImageUpload } from "@/components/admin/ImageUpload";
+import { ImageGallery } from "@/components/admin/ImageGallery";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -42,6 +45,7 @@ export default function EditProductPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [product, setProduct] = useState<ProductWithImagesDto | null>(null);
 
   // Form state
   const [nombre, setNombre] = useState("");
@@ -65,31 +69,34 @@ export default function EditProductPage() {
 
     const loadData = async () => {
       try {
-        const [product, cats] = await Promise.all([
+        const [productData, cats] = await Promise.all([
           getProductByIdApi(productId),
           listCategoriesApi({ active: true }),
         ]);
 
         setCategories(cats);
+        setProduct(productData);
 
         // Llenar el formulario con los datos del producto
-        setNombre(product.nombre);
-        setCategoriaId(String(product.categoria_id));
-        setDescripcionBreve(product.descripcion_breve || "");
-        setDescripcionCompleta(product.descripcion_completa || "");
-        setIngredientes(product.ingredientes || "");
-        setPrecioBase(product.precio_base);
-        setControlStock(product.control_stock);
-        setStockActual(product.stock_actual?.toString() || "");
-        setDisponible(product.disponible);
-        setTienePersonalizacion(product.tiene_personalizacion);
-        if (product.opciones_personalizacion) {
+        setNombre(productData.nombre);
+        setCategoriaId(String(productData.categoria_id));
+        setDescripcionBreve(productData.descripcion_breve || "");
+        setDescripcionCompleta(productData.descripcion_completa || "");
+        setIngredientes(productData.ingredientes || "");
+        setPrecioBase(productData.precio_base);
+        setControlStock(productData.control_stock);
+        setStockActual(productData.stock_actual?.toString() || "");
+        setDisponible(productData.disponible);
+        setTienePersonalizacion(productData.tiene_personalizacion);
+        if (productData.opciones_personalizacion) {
           setOpcionesPersonalizacion(
-            JSON.stringify(product.opciones_personalizacion, null, 2)
+            JSON.stringify(productData.opciones_personalizacion, null, 2),
           );
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error al cargar producto");
+        setError(
+          err instanceof Error ? err.message : "Error al cargar producto",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -97,6 +104,15 @@ export default function EditProductPage() {
 
     loadData();
   }, [router, productId]);
+
+  const handleImageUpdate = async () => {
+    try {
+      const updatedProduct = await getProductByIdApi(productId);
+      setProduct(updatedProduct);
+    } catch (err) {
+      console.error("Error al actualizar imágenes:", err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,13 +129,15 @@ export default function EditProductPage() {
         descripcion_completa: descripcionCompleta || undefined,
         ingredientes: ingredientes || undefined,
         control_stock: controlStock,
-        stock_actual: controlStock ? (parseInt(stockActual) || 0) : undefined,
+        stock_actual: controlStock ? parseInt(stockActual) || 0 : undefined,
         tiene_personalizacion: tienePersonalizacion,
       };
 
       if (tienePersonalizacion && opcionesPersonalizacion) {
         try {
-          payload.opciones_personalizacion = JSON.parse(opcionesPersonalizacion);
+          payload.opciones_personalizacion = JSON.parse(
+            opcionesPersonalizacion,
+          );
         } catch {
           setError("El JSON de opciones de personalización no es válido");
           setIsSaving(false);
@@ -130,7 +148,9 @@ export default function EditProductPage() {
       await updateProductApi(productId, payload);
       router.push("/admin/products");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al actualizar producto");
+      setError(
+        err instanceof Error ? err.message : "Error al actualizar producto",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -162,173 +182,218 @@ export default function EditProductPage() {
           </Button>
         </div>
 
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Editar Producto</CardTitle>
-            <CardDescription>
-              Modifica los datos del producto
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Nombre */}
-              <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre *</Label>
-                <Input
-                  id="nombre"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Torta de Chocolate"
-                  required
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Gestión de Imágenes */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Imágenes del Producto</CardTitle>
+              <CardDescription>
+                Sube y gestiona las imágenes del producto
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Upload de nuevas imágenes */}
+              <ImageUpload
+                productId={productId}
+                onUploadSuccess={handleImageUpdate}
+              />
+
+              {/* Galería de imágenes existentes */}
+              {product?.imagenes && product.imagenes.length > 0 && (
+                <ImageGallery
+                  images={product.imagenes}
+                  onUpdate={handleImageUpdate}
                 />
-              </div>
+              )}
+            </CardContent>
+          </Card>
 
-              {/* Categoría */}
-              <div className="space-y-2">
-                <Label htmlFor="categoria">Categoría *</Label>
-                <Select value={categoriaId} onValueChange={setCategoriaId} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.categoria_id} value={String(cat.categoria_id)}>
-                        {cat.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Precio */}
-              <div className="space-y-2">
-                <Label htmlFor="precio">Precio (S/) *</Label>
-                <Input
-                  id="precio"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={precioBase}
-                  onChange={(e) => setPrecioBase(e.target.value)}
-                  placeholder="45.00"
-                  required
-                />
-              </div>
-
-              {/* Descripción breve */}
-              <div className="space-y-2">
-                <Label htmlFor="descripcion_breve">Descripción breve</Label>
-                <Input
-                  id="descripcion_breve"
-                  value={descripcionBreve}
-                  onChange={(e) => setDescripcionBreve(e.target.value)}
-                  placeholder="Descripción corta para listados"
-                />
-              </div>
-
-              {/* Descripción completa */}
-              <div className="space-y-2">
-                <Label htmlFor="descripcion_completa">Descripción completa</Label>
-                <Textarea
-                  id="descripcion_completa"
-                  value={descripcionCompleta}
-                  onChange={(e) => setDescripcionCompleta(e.target.value)}
-                  placeholder="Descripción detallada del producto"
-                  rows={3}
-                />
-              </div>
-
-              {/* Ingredientes */}
-              <div className="space-y-2">
-                <Label htmlFor="ingredientes">Ingredientes</Label>
-                <Textarea
-                  id="ingredientes"
-                  value={ingredientes}
-                  onChange={(e) => setIngredientes(e.target.value)}
-                  placeholder="Harina, azúcar, huevos..."
-                  rows={2}
-                />
-              </div>
-
-              {/* Disponible */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Disponible</Label>
-                  <p className="text-sm text-muted-foreground">
-                    El producto está disponible para la venta
-                  </p>
-                </div>
-                <Switch checked={disponible} onCheckedChange={setDisponible} />
-              </div>
-
-              {/* Control de stock */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Control de stock</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Activar control de inventario
-                  </p>
-                </div>
-                <Switch checked={controlStock} onCheckedChange={setControlStock} />
-              </div>
-
-              {/* Stock actual */}
-              {controlStock && (
+          {/* Formulario de datos del producto */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Información del Producto</CardTitle>
+              <CardDescription>Modifica los datos del producto</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Nombre */}
                 <div className="space-y-2">
-                  <Label htmlFor="stock">Stock actual</Label>
+                  <Label htmlFor="nombre">Nombre *</Label>
                   <Input
-                    id="stock"
-                    type="number"
-                    min="0"
-                    value={stockActual}
-                    onChange={(e) => setStockActual(e.target.value)}
-                    placeholder="10"
+                    id="nombre"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    placeholder="Ej: Torta de Chocolate"
+                    required
                   />
                 </div>
-              )}
 
-              {/* Personalización */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Tiene personalización</Label>
-                  <p className="text-sm text-muted-foreground">
-                    El cliente puede personalizar el producto
-                  </p>
-                </div>
-                <Switch
-                  checked={tienePersonalizacion}
-                  onCheckedChange={setTienePersonalizacion}
-                />
-              </div>
-
-              {/* Opciones de personalización */}
-              {tienePersonalizacion && (
+                {/* Categoría */}
                 <div className="space-y-2">
-                  <Label htmlFor="opciones">Opciones de personalización (JSON)</Label>
-                  <Textarea
-                    id="opciones"
-                    value={opcionesPersonalizacion}
-                    onChange={(e) => setOpcionesPersonalizacion(e.target.value)}
-                    placeholder='{"tamaños": ["pequeño", "mediano", "grande"]}'
-                    rows={4}
-                    className="font-mono text-sm"
+                  <Label htmlFor="categoria">Categoría *</Label>
+                  <Select
+                    value={categoriaId}
+                    onValueChange={setCategoriaId}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem
+                          key={cat.categoria_id}
+                          value={String(cat.categoria_id)}
+                        >
+                          {cat.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Precio */}
+                <div className="space-y-2">
+                  <Label htmlFor="precio">Precio (S/) *</Label>
+                  <Input
+                    id="precio"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={precioBase}
+                    onChange={(e) => setPrecioBase(e.target.value)}
+                    placeholder="45.00"
+                    required
                   />
                 </div>
-              )}
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+                {/* Descripción breve */}
+                <div className="space-y-2">
+                  <Label htmlFor="descripcion_breve">Descripción breve</Label>
+                  <Input
+                    id="descripcion_breve"
+                    value={descripcionBreve}
+                    onChange={(e) => setDescripcionBreve(e.target.value)}
+                    placeholder="Descripción corta para listados"
+                  />
+                </div>
 
-              <div className="flex gap-4">
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? "Guardando..." : "Guardar Cambios"}
-                </Button>
-                <Button type="button" variant="outline" asChild>
-                  <Link href="/admin/products">Cancelar</Link>
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                {/* Descripción completa */}
+                <div className="space-y-2">
+                  <Label htmlFor="descripcion_completa">
+                    Descripción completa
+                  </Label>
+                  <Textarea
+                    id="descripcion_completa"
+                    value={descripcionCompleta}
+                    onChange={(e) => setDescripcionCompleta(e.target.value)}
+                    placeholder="Descripción detallada del producto"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Ingredientes */}
+                <div className="space-y-2">
+                  <Label htmlFor="ingredientes">Ingredientes</Label>
+                  <Textarea
+                    id="ingredientes"
+                    value={ingredientes}
+                    onChange={(e) => setIngredientes(e.target.value)}
+                    placeholder="Harina, azúcar, huevos..."
+                    rows={2}
+                  />
+                </div>
+
+                {/* Disponible */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Disponible</Label>
+                    <p className="text-sm text-muted-foreground">
+                      El producto está disponible para la venta
+                    </p>
+                  </div>
+                  <Switch
+                    checked={disponible}
+                    onCheckedChange={setDisponible}
+                  />
+                </div>
+
+                {/* Control de stock */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Control de stock</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activar control de inventario
+                    </p>
+                  </div>
+                  <Switch
+                    checked={controlStock}
+                    onCheckedChange={setControlStock}
+                  />
+                </div>
+
+                {/* Stock actual */}
+                {controlStock && (
+                  <div className="space-y-2">
+                    <Label htmlFor="stock">Stock actual</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="0"
+                      value={stockActual}
+                      onChange={(e) => setStockActual(e.target.value)}
+                      placeholder="10"
+                    />
+                  </div>
+                )}
+
+                {/* Personalización */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Tiene personalización</Label>
+                    <p className="text-sm text-muted-foreground">
+                      El cliente puede personalizar el producto
+                    </p>
+                  </div>
+                  <Switch
+                    checked={tienePersonalizacion}
+                    onCheckedChange={setTienePersonalizacion}
+                  />
+                </div>
+
+                {/* Opciones de personalización */}
+                {tienePersonalizacion && (
+                  <div className="space-y-2">
+                    <Label htmlFor="opciones">
+                      Opciones de personalización (JSON)
+                    </Label>
+                    <Textarea
+                      id="opciones"
+                      value={opcionesPersonalizacion}
+                      onChange={(e) =>
+                        setOpcionesPersonalizacion(e.target.value)
+                      }
+                      placeholder='{"tamaños": ["pequeño", "mediano", "grande"]}'
+                      rows={4}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                )}
+
+                {error && <p className="text-sm text-red-500">{error}</p>}
+
+                <div className="flex gap-4">
+                  <Button type="submit" disabled={isSaving}>
+                    {isSaving ? "Guardando..." : "Guardar Cambios"}
+                  </Button>
+                  <Button type="button" variant="outline" asChild>
+                    <Link href="/admin/products">Cancelar</Link>
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

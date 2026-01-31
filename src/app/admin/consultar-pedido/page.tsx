@@ -15,11 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getOrderApi } from "@/lib/api";
+import { getOrderByNumberApi } from "@/lib/api";
 
 export default function ConsultarPedidoAdminPage() {
   const router = useRouter();
-  const [orderId, setOrderId] = useState("");
+  const [orderNumber, setOrderNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,25 +28,22 @@ export default function ConsultarPedidoAdminPage() {
     setError(null);
     setIsLoading(true);
 
-    const id = parseInt(orderId.trim(), 10);
-    if (isNaN(id)) {
-      setError("Ingresa un ID de pedido válido.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const order = await getOrderApi(id);
+      const order = await getOrderByNumberApi(orderNumber.trim());
 
       if (!order) {
-        setError("Pedido no encontrado. Verifica el ID e intenta nuevamente.");
+        setError(
+          "Pedido no encontrado. Verifica el número e intenta nuevamente.",
+        );
         setIsLoading(false);
         return;
       }
 
       router.push(`/admin/orders/${order.pedido_id}`);
     } catch (error) {
-      setError("Pedido no encontrado. Verifica el ID e intenta nuevamente.");
+      setError(
+        "Pedido no encontrado. Verifica el número e intenta nuevamente.",
+      );
       setIsLoading(false);
     }
   };
@@ -58,10 +55,10 @@ export default function ConsultarPedidoAdminPage() {
         <div className="max-w-2xl mx-auto">
           <div className="mb-8 text-center">
             <h1 className="text-3xl md:text-4xl font-bold mb-2">
-              Buscar Pedido por ID
+              Buscar Pedido
             </h1>
             <p className="text-muted-foreground">
-              Busca un pedido específico por su ID
+              Busca un pedido por su número de orden
             </p>
           </div>
 
@@ -69,19 +66,19 @@ export default function ConsultarPedidoAdminPage() {
             <CardHeader>
               <CardTitle>Buscar Pedido</CardTitle>
               <CardDescription>
-                Ingresa el ID del pedido para ver sus detalles
+                Ingresa el número de orden para ver sus detalles
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="orderId">ID del Pedido</Label>
+                  <Label htmlFor="orderNumber">Número de Orden</Label>
                   <Input
-                    id="orderId"
-                    type="number"
-                    placeholder="Ej: 23"
-                    value={orderId}
-                    onChange={(e) => setOrderId(e.target.value)}
+                    id="orderNumber"
+                    type="text"
+                    placeholder="Ej: ORD-1769539124188-505"
+                    value={orderNumber}
+                    onChange={(e) => setOrderNumber(e.target.value)}
                     required
                   />
                 </div>

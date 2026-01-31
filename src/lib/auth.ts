@@ -75,6 +75,43 @@ export function isAdmin(): boolean {
   return user?.rol === "administrador";
 }
 
+// ====== Token Expiration Checks ======
+
+/**
+ * Verifica si el token de acceso está expirado
+ */
+export function isTokenExpired(): boolean {
+  const payload = decodeJwt();
+  if (!payload) return true;
+
+  const now = Math.floor(Date.now() / 1000); // Tiempo actual en segundos
+  return payload.exp <= now;
+}
+
+/**
+ * Verifica si el token está por expirar en los próximos minutos
+ * @param minutesBeforeExpiry - Minutos antes de la expiración (default: 5)
+ */
+export function isTokenExpiringSoon(minutesBeforeExpiry: number = 5): boolean {
+  const payload = decodeJwt();
+  if (!payload) return true;
+
+  const now = Math.floor(Date.now() / 1000); // Tiempo actual en segundos
+  const bufferTime = minutesBeforeExpiry * 60; // Convertir minutos a segundos
+  return payload.exp - now <= bufferTime;
+}
+
+/**
+ * Obtiene el tiempo restante hasta la expiración del token (en segundos)
+ */
+export function getTokenTimeToExpiry(): number | null {
+  const payload = decodeJwt();
+  if (!payload) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  return Math.max(0, payload.exp - now);
+}
+
 // ====== Cookie helpers for middleware (server-side) ======
 
 export function setAuthCookies(authResponse: AuthResponse): string[] {

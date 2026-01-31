@@ -8,8 +8,10 @@ import {
   getOrderApi,
   createCulqiChargeApi,
   createCulqiOrderApi,
+  updatePaymentMethodApi,
 } from "@/lib/api";
 import { Loader2, CreditCard } from "lucide-react";
+import { useCartStore } from "@/store/cart-store";
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [preparingPayment, setPreparingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const clearCart = useCartStore((state) => state.clearCart);
 
   /* ---------------- LOAD CULQI SCRIPT ---------------- */
   useEffect(() => {
@@ -70,6 +73,7 @@ export default function PaymentPage() {
         });
 
         if (res.outcome_type === "venta_exitosa") {
+          clearCart();
           localStorage.removeItem("pendingOrder");
           router.push(`/cliente/pedido/${orderData.pedidoId}`);
         } else {
@@ -79,7 +83,7 @@ export default function PaymentPage() {
         setError(err.message || "Error de pago");
       }
     },
-    [orderData, router],
+    [orderData, router, clearCart],
   );
 
   /* ---------------- OPEN CULQI ---------------- */
@@ -161,14 +165,30 @@ export default function PaymentPage() {
 
     culqiRef.current = new (window as any).CulqiCheckout(publicKey, config);
 
-    culqiRef.current.culqi = () => {
+    culqiRef.current.culqi = async () => {
+      console.log("=== CULQI CALLBACK ===");
+      console.log("token:", culqiRef.current.token);
+      console.log("order:", culqiRef.current.order);
+      console.log("error:", culqiRef.current.error);
+
       if (culqiRef.current.token) {
         const token = culqiRef.current.token;
         culqiRef.current.close();
+        // Culqi usa prefijo "ype_" para tokens de Yape
+        const metodo = token.id?.startsWith("ype_") ? "yape" : "tarjeta";
+        console.log("Método detectado:", metodo, "| token id:", token.id);
+        await updatePaymentMethodApi(orderData.pedidoId, metodo).catch((e) =>
+          console.error("Error update payment method:", e),
+        );
         processPayment(token.id, token.email || orderData.email);
       } else if (culqiRef.current.order) {
-        // Yape / billeteras - el pago ya fue procesado por Culqi
+        // Order-based payment (Yape u otro)
         culqiRef.current.close();
+        console.log("Método detectado: yape (order)");
+        await updatePaymentMethodApi(orderData.pedidoId, "yape").catch((e) =>
+          console.error("Error update payment method:", e),
+        );
+        clearCart();
         localStorage.removeItem("pendingOrder");
         router.push(`/cliente/pedido/${orderData.pedidoId}`);
       } else {

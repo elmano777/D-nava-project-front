@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -11,13 +12,21 @@ import {
   LogOut,
   Tags,
   Search,
+  Shield,
+  User,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
-import { clearAuthData } from "@/lib/auth";
+import { clearAuthData, getStoredUser } from "@/lib/auth";
+import { AuthUser } from "@/lib/api";
 
 export function AdminNav() {
   const router = useRouter();
   const pathname = usePathname();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
 
   const handleLogout = () => {
     // Limpiar localStorage
@@ -37,6 +46,7 @@ export function AdminNav() {
     { href: "/admin/orders", label: "Pedidos", icon: ShoppingCart },
     { href: "/admin/consultar-pedido", label: "Buscar Pedido", icon: Search },
     { href: "/admin/reports", label: "Reportes", icon: BarChart3 },
+    { href: "/admin/admins", label: "Administradores", icon: Shield },
   ];
 
   return (
@@ -74,10 +84,11 @@ export function AdminNav() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/">Ver Sitio</Link>
-            </Button>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+              <User className="h-4 w-4" />
+              <span>{user?.nombre_completo || user?.email || "Admin"}</span>
+            </div>
             <Button
               onClick={handleLogout}
               variant="ghost"

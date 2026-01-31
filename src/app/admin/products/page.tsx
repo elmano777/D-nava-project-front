@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { getStoredUser } from "@/lib/auth";
-import { listProductsApi, ProductDto } from "@/lib/api";
+import { listProductsApi, updateProductApi, ProductDto } from "@/lib/api";
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -36,6 +36,20 @@ export default function AdminProductsPage() {
 
     loadProducts();
   }, [router]);
+
+  const handleToggleDisponible = async (id: number, currentState: boolean) => {
+    try {
+      const updated = await updateProductApi(id, { disponible: !currentState });
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.producto_id === id ? { ...p, disponible: updated.disponible } : p,
+        ),
+      );
+    } catch (error) {
+      console.error("Error actualizando producto:", error);
+      alert("Error al actualizar el estado del producto");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -69,7 +83,10 @@ export default function AdminProductsPage() {
           </Button>
         </div>
 
-        <ProductsTable products={products} />
+        <ProductsTable
+          products={products}
+          onToggleDisponible={handleToggleDisponible}
+        />
       </main>
     </div>
   );

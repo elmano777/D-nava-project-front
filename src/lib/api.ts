@@ -1,3 +1,11 @@
+import {
+  getAccessToken,
+  getRefreshToken,
+  saveAuthData,
+  clearAuthData,
+  isTokenExpiringSoon,
+} from "./auth";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
@@ -6,10 +14,86 @@ export interface ApiError extends Error {
   details?: unknown;
 }
 
+// Flag para evitar múltiples refresh simultáneos
+let isRefreshing = false;
+let refreshPromise: Promise<void> | null = null;
+
+/**
+ * Refresca el access token usando el refresh token
+ */
+async function refreshAccessToken(): Promise<void> {
+  // Si ya hay un refresh en proceso, esperar a que termine
+  if (isRefreshing && refreshPromise) {
+    await refreshPromise;
+    return;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        throw new Error("No refresh token available");
+      }
+
+      // Llamar al endpoint de refresh directamente sin usar apiFetch para evitar recursión
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to refresh token");
+      }
+
+      const data = await response.json();
+
+      // Guardar los nuevos tokens
+      saveAuthData(data);
+
+      // También actualizar la cookie si es necesario
+      if (typeof document !== "undefined") {
+        document.cookie = `access_token=${data.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
+      }
+
+      console.log("✅ Token refrescado automáticamente");
+    } catch (error) {
+      console.error("❌ Error al refrescar token:", error);
+      // Si el refresh falla, limpiar todo y redirigir al login
+      clearAuthData();
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
+      }
+      throw error;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  await refreshPromise;
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit & { auth?: boolean } = {},
 ): Promise<T> {
+  // Si requiere autenticación y el token está por expirar, refrescarlo primero
+  if (options.auth && typeof window !== "undefined") {
+    if (isTokenExpiringSoon(5)) {
+      // 5 minutos antes de expirar
+      try {
+        await refreshAccessToken();
+      } catch (error) {
+        // Si falla el refresh, continuar con el token actual (fallará en el servidor)
+        console.error("Error al refrescar token antes del request:", error);
+      }
+    }
+  }
+
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers = new Headers(options.headers || {});
@@ -25,7 +109,7 @@ async function apiFetch<T>(
   // Token JWT almacenado en localStorage (cliente). En server actions no habrá localStorage.
   if (options.auth) {
     if (typeof window !== "undefined") {
-      const token = window.localStorage.getItem("access_token");
+      const token = getAccessToken();
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
@@ -46,6 +130,52 @@ async function apiFetch<T>(
   }
 
   if (!res.ok) {
+    // Si es 401 (Unauthorized) y requiere auth, intentar refrescar el token y reintentar
+    if (res.status === 401 && options.auth && typeof window !== "undefined") {
+      try {
+        console.log("🔄 Token expirado, intentando refrescar...");
+        await refreshAccessToken();
+
+        // Reintentar el request con el nuevo token
+        const newToken = getAccessToken();
+        if (newToken) {
+          headers.set("Authorization", `Bearer ${newToken}`);
+          const retryRes = await fetch(url, {
+            ...options,
+            headers,
+          });
+
+          const retryText = await retryRes.text();
+          let retryData: unknown = null;
+          try {
+            retryData = retryText ? JSON.parse(retryText) : null;
+          } catch {
+            retryData = retryText;
+          }
+
+          if (retryRes.ok) {
+            console.log("✅ Request exitoso después de refrescar token");
+            return retryData as T;
+          }
+
+          // Si el retry también falla, lanzar el error
+          const retryError: ApiError = new Error(
+            (retryData &&
+            typeof retryData === "object" &&
+            "message" in retryData
+              ? (retryData as any).message
+              : "Error en la petición al backend") as string,
+          );
+          retryError.status = retryRes.status;
+          retryError.details = retryData;
+          throw retryError;
+        }
+      } catch (refreshError) {
+        console.error("❌ No se pudo refrescar el token:", refreshError);
+        // Si falla el refresh, el usuario será redirigido al login automáticamente
+      }
+    }
+
     const error: ApiError = new Error(
       (data && typeof data === "object" && "message" in data
         ? (data as any).message
@@ -91,6 +221,88 @@ export async function registerApi(payload: {
 }) {
   return apiFetch<AuthResponse>("/auth/register", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function sendVerificationCodeApi(email: string) {
+  return apiFetch<{ message: string }>("/auth/send-verification-code", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function confirmEmailApi(email: string, codigo: string) {
+  return apiFetch<{ message: string }>("/auth/confirm-email", {
+    method: "POST",
+    body: JSON.stringify({ email, codigo }),
+  });
+}
+
+export interface ProfileResponse extends AuthUser {
+  fecha_creacion?: string;
+  email_verificado?: boolean;
+}
+
+export async function getProfileApi() {
+  return apiFetch<ProfileResponse>("/auth/profile", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function updateProfileApi(payload: {
+  nombre_completo?: string;
+  telefono?: string;
+}) {
+  return apiFetch<ProfileResponse>("/auth/profile", {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function changePasswordApi(payload: {
+  password_actual: string;
+  nueva_password: string;
+}) {
+  return apiFetch<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function forgotPasswordApi(email: string) {
+  return apiFetch<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPasswordApi(token: string, nueva_password: string) {
+  return apiFetch<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, nueva_password }),
+  });
+}
+
+export async function refreshTokenApi(refresh_token: string) {
+  return apiFetch<AuthResponse>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token }),
+  });
+}
+
+export async function registerAdminApi(payload: {
+  email: string;
+  password: string;
+  nombre_completo: string;
+  telefono?: string;
+}) {
+  return apiFetch<AuthResponse>("/auth/register/admin", {
+    method: "POST",
+    auth: true, // Requiere autenticación de administrador
     body: JSON.stringify(payload),
   });
 }
@@ -153,6 +365,29 @@ export async function getPaymentStatusApi(pedidoId: number) {
   return apiFetch<PaymentStatusResponse>(`/payments/${pedidoId}/status`, {
     method: "GET",
     auth: true,
+  });
+}
+
+export interface CulqiRefundPayload {
+  pedido_id: number;
+  amount?: number; // Opcional para devolución parcial (en centavos)
+  reason: "duplicado" | "fraudulento" | "solicitud_comprador";
+}
+
+export interface CulqiRefundResponse {
+  refund_id: string;
+  charge_id: string;
+  amount: number;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
+export async function createCulqiRefundApi(payload: CulqiRefundPayload) {
+  return apiFetch<CulqiRefundResponse>("/payments/culqi/refund", {
+    method: "POST",
+    auth: true,
+    body: JSON.stringify(payload),
   });
 }
 
@@ -224,8 +459,20 @@ export async function createOrderApi(payload: CreateOrderPayload) {
   });
 }
 
-export async function listOrdersApi() {
-  return apiFetch<OrderDto[]>("/orders", {
+export async function listOrdersApi(params?: {
+  estado_pedido?: OrderEstadoPedido;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.estado_pedido)
+    searchParams.set("estado_pedido", params.estado_pedido);
+  if (params?.limit !== undefined)
+    searchParams.set("limit", String(params.limit));
+  if (params?.offset !== undefined)
+    searchParams.set("offset", String(params.offset));
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return apiFetch<OrderDto[]>(`/orders${query}`, {
     method: "GET",
     auth: true,
   });
@@ -257,6 +504,25 @@ export async function updateOrderStatusApi(
     method: "PATCH",
     auth: true,
     body: JSON.stringify(data),
+  });
+}
+
+export async function cancelOrderApi(id: number, motivo?: string) {
+  return apiFetch<OrderDto>(`/orders/${id}/cancel`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify({ motivo_cancelacion: motivo }),
+  });
+}
+
+export async function updatePaymentMethodApi(
+  id: number,
+  metodo_pago: "tarjeta" | "yape",
+) {
+  return apiFetch<OrderDto>(`/orders/${id}/payment-method`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify({ metodo_pago }),
   });
 }
 
@@ -330,6 +596,70 @@ export async function getSalesStatsApi(period?: string) {
   });
 }
 
+export interface SalesReportItem {
+  fecha: string;
+  total: number;
+  cantidad_pedidos: number;
+}
+
+export interface SalesReportResponse {
+  total_ventas: number;
+  total_pedidos: number;
+  promedio_venta: number;
+  periodo: string;
+  ventas_por_dia: SalesReportItem[];
+}
+
+export async function getSalesReportApi(params?: {
+  period?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.period) searchParams.set("period", params.period);
+  if (params?.startDate) searchParams.set("startDate", params.startDate);
+  if (params?.endDate) searchParams.set("endDate", params.endDate);
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  return apiFetch<SalesReportResponse>(`/reports/sales${query}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface TopProduct {
+  producto_id: number;
+  nombre_producto: string;
+  cantidad_vendida: number;
+  total_ingresos: string;
+  cantidad_pedidos: number;
+}
+
+export async function getTopProductsApi(limit: number = 10) {
+  return apiFetch<TopProduct[]>(`/reports/top-products?limit=${limit}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface ProductSalesReport {
+  producto_id: number;
+  nombre: string;
+  total_vendido: number;
+  ingresos_totales: number;
+  ventas_por_periodo: Array<{
+    fecha: string;
+    cantidad: number;
+    ingresos: number;
+  }>;
+}
+
+export async function getProductSalesApi(productId: number) {
+  return apiFetch<ProductSalesReport>(`/reports/products/${productId}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
 // ====== Products (Admin) ======
 
 export interface ProductDto {
@@ -352,12 +682,20 @@ export interface ProductDto {
 export async function listProductsApi(params?: {
   active?: boolean;
   categoria_id?: number;
+  search?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const searchParams = new URLSearchParams();
   if (params?.active !== undefined)
     searchParams.set("disponible", String(params.active));
   if (params?.categoria_id !== undefined)
     searchParams.set("categoria_id", String(params.categoria_id));
+  if (params?.search) searchParams.set("search", params.search);
+  if (params?.limit !== undefined)
+    searchParams.set("limit", String(params.limit));
+  if (params?.offset !== undefined)
+    searchParams.set("offset", String(params.offset));
   const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
   return apiFetch<ProductDto[]>(`/products${query}`, {
     method: "GET",
@@ -409,6 +747,56 @@ export async function deleteProductApi(id: number) {
   });
 }
 
+export async function updateProductStockApi(id: number, quantity: number) {
+  return apiFetch<ProductDto>(`/products/${id}/stock`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify({ quantity }),
+  });
+}
+
+// ====== Product Images (AWS) ======
+
+export interface ProductImageDto {
+  imagen_id: number;
+  producto_id: number;
+  url_s3: string;
+  orden: number;
+  fecha_subida: string;
+}
+
+export async function uploadProductImageApi(
+  productId: number,
+  file: File,
+): Promise<ProductImageDto> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiFetch<ProductImageDto>(`/aws/product-image/${productId}`, {
+    method: "POST",
+    auth: true,
+    body: formData,
+  });
+}
+
+export async function deleteImageApi(imageId: number): Promise<void> {
+  return apiFetch<void>(`/aws/image/${imageId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export async function reorderImageApi(
+  imageId: number,
+  orden: number,
+): Promise<ProductImageDto> {
+  return apiFetch<ProductImageDto>(`/aws/image/${imageId}/reorder`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify({ orden }),
+  });
+}
+
 // ====== Categories ======
 
 export interface CategoryDto {
@@ -421,6 +809,14 @@ export interface CategoryDto {
 }
 
 export async function listCategoriesApi(params?: { active?: boolean }) {
+  const query = params?.active !== undefined ? `?active=${params.active}` : "";
+  return apiFetch<CategoryDto[]>(`/categories${query}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function listCategoriesPublicApi(params?: { active?: boolean }) {
   const query = params?.active !== undefined ? `?active=${params.active}` : "";
   return apiFetch<CategoryDto[]>(`/categories${query}`, {
     method: "GET",
@@ -449,6 +845,14 @@ export async function updateCategoryApi(
     method: "PATCH",
     auth: true,
     body: JSON.stringify(payload),
+  });
+}
+
+export async function toggleCategoryActiveApi(id: number, activa: boolean) {
+  return apiFetch<CategoryDto>(`/categories/${id}`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify({ activa }),
   });
 }
 
@@ -488,6 +892,8 @@ export async function getProductsPublicApi(params?: {
   categoria_id?: number;
   disponible?: boolean;
   busqueda?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const searchParams = new URLSearchParams();
   if (params?.categoria_id !== undefined)
@@ -495,6 +901,10 @@ export async function getProductsPublicApi(params?: {
   if (params?.disponible !== undefined)
     searchParams.set("disponible", String(params.disponible));
   if (params?.busqueda) searchParams.set("busqueda", params.busqueda);
+  if (params?.limit !== undefined)
+    searchParams.set("limit", String(params.limit));
+  if (params?.offset !== undefined)
+    searchParams.set("offset", String(params.offset));
   const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
   return apiFetch<ProductWithImagesDto[]>(`/products${query}`, {
     method: "GET",
@@ -511,9 +921,20 @@ export async function getProductByIdApi(id: number) {
 
 export async function getOrderByNumberApi(orderNumber: string) {
   return apiFetch<OrderDto | null>(
-    `/orders/${encodeURIComponent(orderNumber)}`,
+    `/orders/by-number/${encodeURIComponent(orderNumber)}`,
     {
       method: "GET",
+      auth: true,
+    },
+  );
+}
+
+export async function getMyOrderByNumberApi(orderNumber: string) {
+  return apiFetch<OrderDto>(
+    `/orders/my-order/${encodeURIComponent(orderNumber)}`,
+    {
+      method: "GET",
+      auth: true,
     },
   );
 }
@@ -530,11 +951,83 @@ export interface OrderDetailDto {
 }
 
 export async function getOrderWithDetailsApi(pedidoId: number) {
-  return apiFetch<OrderDto & { detalles: OrderDetailDto[] }>(
+  return apiFetch<OrderDto & { items: OrderDetailDto[] }>(
     `/orders/${pedidoId}`,
     {
       method: "GET",
       auth: true,
     },
   );
+}
+
+// ====== Addresses ======
+
+export interface AddressDto {
+  direccion_id: number;
+  usuario_id: number;
+  alias: string;
+  direccion_linea1: string;
+  direccion_linea2: string | null;
+  distrito: string;
+  ciudad: string;
+  codigo_postal: string;
+  es_predeterminada: boolean;
+  fecha_creacion: string;
+  fecha_modificacion: string;
+}
+
+export async function getAddressesApi() {
+  return apiFetch<AddressDto[]>("/users/me/addresses", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createAddressApi(payload: {
+  alias: string;
+  direccion_linea1: string;
+  direccion_linea2?: string;
+  distrito: string;
+  ciudad: string;
+  codigo_postal: string;
+  es_predeterminada?: boolean;
+}) {
+  return apiFetch<AddressDto>("/users/me/addresses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    auth: true,
+  });
+}
+
+export async function updateAddressApi(
+  addressId: number,
+  payload: Partial<{
+    alias: string;
+    direccion_linea1: string;
+    direccion_linea2: string;
+    distrito: string;
+    ciudad: string;
+    codigo_postal: string;
+    es_predeterminada: boolean;
+  }>,
+) {
+  return apiFetch<AddressDto>(`/users/me/addresses/${addressId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    auth: true,
+  });
+}
+
+export async function deleteAddressApi(addressId: number) {
+  return apiFetch<void>(`/users/me/addresses/${addressId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export async function setDefaultAddressApi(addressId: number) {
+  return apiFetch<AddressDto>(`/users/me/addresses/${addressId}/set-default`, {
+    method: "POST",
+    auth: true,
+  });
 }

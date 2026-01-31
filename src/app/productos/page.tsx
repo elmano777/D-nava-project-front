@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/product-card";
 import { CategoryFilter } from "@/components/category-filter";
 import {
   getProductsPublicApi,
-  listCategoriesApi,
+  listCategoriesPublicApi,
   ProductWithImagesDto,
   CategoryDto,
 } from "@/lib/api";
@@ -25,7 +25,7 @@ function ProductsContent() {
     const loadData = async () => {
       try {
         // Cargar categorías activas
-        const categoriesData = await listCategoriesApi({ active: true });
+        const categoriesData = await listCategoriesPublicApi({ active: true });
         setCategories(categoriesData);
 
         // Buscar categoría por nombre si hay parámetro
@@ -81,10 +81,12 @@ function ProductsContent() {
                 id: String(product.producto_id),
                 name: product.nombre,
                 description: product.descripcion_breve || "",
+                fullDescription: product.descripcion_completa || "",
                 price_in_cents: Math.round(
                   parseFloat(product.precio_base) * 100,
                 ),
                 image_url: product.imagenes?.[0]?.url_s3 || "/placeholder.jpg",
+                images: product.imagenes?.map((img) => img.url_s3) || [],
                 stock: product.control_stock ? product.stock_actual || 0 : 999,
               }}
             />

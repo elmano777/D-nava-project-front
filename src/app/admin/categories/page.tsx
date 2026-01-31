@@ -13,10 +13,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit } from "lucide-react";
 import Link from "next/link";
 import { getStoredUser } from "@/lib/auth";
-import { listCategoriesApi, deleteCategoryApi, CategoryDto } from "@/lib/api";
+import { Switch } from "@/components/ui/switch";
+import {
+  listCategoriesApi,
+  toggleCategoryActiveApi,
+  CategoryDto,
+} from "@/lib/api";
 
 export default function AdminCategoriesPage() {
   const router = useRouter();
@@ -44,15 +49,15 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de eliminar esta categoría?")) return;
-
+  const handleToggleActive = async (id: number, currentState: boolean) => {
     try {
-      await deleteCategoryApi(id);
-      setCategories((prev) => prev.filter((c) => c.categoria_id !== id));
+      const updated = await toggleCategoryActiveApi(id, !currentState);
+      setCategories((prev) =>
+        prev.map((c) => (c.categoria_id === id ? updated : c)),
+      );
     } catch (error) {
-      console.error("Error eliminando categoría:", error);
-      alert("Error al eliminar la categoría");
+      console.error("Error actualizando categoría:", error);
+      alert("Error al actualizar el estado de la categoría");
     }
   };
 
@@ -118,22 +123,30 @@ export default function AdminCategoriesPage() {
                       {category.descripcion || "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={category.activa ? "default" : "secondary"}>
-                        {category.activa ? "Activa" : "Inactiva"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={category.activa}
+                          onCheckedChange={() =>
+                            handleToggleActive(
+                              category.categoria_id,
+                              category.activa,
+                            )
+                          }
+                        />
+                        <Badge
+                          variant={category.activa ? "default" : "secondary"}
+                        >
+                          {category.activa ? "Activa" : "Inactiva"}
+                        </Badge>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="text-right">
                       <Button asChild variant="ghost" size="sm">
-                        <Link href={`/admin/categories/${category.categoria_id}`}>
+                        <Link
+                          href={`/admin/categories/${category.categoria_id}`}
+                        >
                           <Edit className="h-4 w-4" />
                         </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(category.categoria_id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
                   </TableRow>

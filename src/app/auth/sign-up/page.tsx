@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { registerApi } from "@/lib/api";
+import { registerApi, sendVerificationCodeApi } from "@/lib/api";
 import { saveAuthData } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +14,18 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Mail, X } from "lucide-react";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -27,12 +35,21 @@ export default function SignUpPage() {
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
   const router = useRouter();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    const telefonoDigits = telefono.replace(/\s/g, "");
+    if (telefonoDigits.length !== 9) {
+      setError("El teléfono debe tener 9 dígitos");
+      setIsLoading(false);
+      return;
+    }
 
     if (password !== repeatPassword) {
       setError("Las contraseñas no coinciden");
@@ -52,7 +69,7 @@ export default function SignUpPage() {
         email,
         password,
         nombre_completo: nombreCompleto,
-        telefono: telefono || undefined,
+        telefono: `+51${telefono.replace(/\s/g, "")}`,
       });
 
       // Guardar tokens y datos del usuario
@@ -62,8 +79,8 @@ export default function SignUpPage() {
       document.cookie = `access_token=${authResponse.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
       document.cookie = `backend_user=${encodeURIComponent(JSON.stringify(authResponse.user))}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
 
-      // Redirigir al dashboard de cliente
-      router.push("/cliente");
+      // Mostrar diálogo de verificación opcional
+      setShowVerificationDialog(true);
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error al registrarse";
@@ -71,6 +88,26 @@ export default function SignUpPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSendVerificationCode = async () => {
+    setIsSendingCode(true);
+    try {
+      await sendVerificationCodeApi(email);
+      // Redirigir a la página de verificación
+      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+    } catch (error: unknown) {
+      console.error("Error al enviar código:", error);
+      // Si falla, igual redirigir al dashboard
+      router.push("/cliente");
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleSkipVerification = () => {
+    setShowVerificationDialog(false);
+    router.push("/cliente");
   };
 
   return (
@@ -113,14 +150,31 @@ export default function SignUpPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="telefono">Teléfono (opcional)</Label>
-                  <Input
-                    id="telefono"
-                    type="tel"
-                    placeholder="+51 999 999 999"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                  />
+                  <Label htmlFor="telefono">Teléfono</Label>
+                  <div className="flex gap-2">
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground select-none">
+                      +51
+                    </div>
+                    <Input
+                      id="telefono"
+                      type="tel"
+                      placeholder="928 750 445"
+                      required
+                      maxLength={11}
+                      value={telefono}
+                      onChange={(e) => {
+                        // Solo permitir dígitos y espacios
+                        const raw = e.target.value.replace(/[^\d]/g, "");
+                        // Formatear con espacios: XXX XXX XXX
+                        const formatted = raw
+                          .slice(0, 9)
+                          .replace(/(\d{3})(\d{0,3})(\d{0,3})/, (_, a, b, c) =>
+                            [a, b, c].filter(Boolean).join(" "),
+                          );
+                        setTelefono(formatted);
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="password">Contraseña</Label>
@@ -160,6 +214,52 @@ export default function SignUpPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Diálogo de verificación opcional */}
+      <Dialog
+        open={showVerificationDialog}
+        onOpenChange={setShowVerificationDialog}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              <DialogTitle>¿Verificar tu email?</DialogTitle>
+            </div>
+            <DialogDescription>
+              Te enviaremos un código de verificación a <strong>{email}</strong>
+              . Esto te permitirá acceder a funciones adicionales en el futuro.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <div className="text-sm text-muted-foreground">
+              <ul className="list-disc list-inside space-y-1">
+                <li>Recuperación de contraseña más segura</li>
+                <li>Notificaciones importantes sobre tus pedidos</li>
+                <li>Acceso a promociones exclusivas</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-col gap-2">
+            <Button
+              onClick={handleSendVerificationCode}
+              disabled={isSendingCode}
+              className="w-full"
+            >
+              {isSendingCode ? "Enviando código..." : "Sí, enviar código"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleSkipVerification}
+              disabled={isSendingCode}
+              className="w-full"
+            >
+              Ahora no, continuar sin verificar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

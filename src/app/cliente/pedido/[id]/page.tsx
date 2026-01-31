@@ -14,11 +14,28 @@ import {
   XCircle,
   Loader2,
   ArrowLeft,
+  MessageCircle,
 } from "lucide-react";
-import { getOrderWithDetailsApi, OrderDto, OrderDetailDto } from "@/lib/api";
+import {
+  getOrderWithDetailsApi,
+  OrderDto,
+  OrderDetailDto,
+  cancelOrderApi,
+  createCulqiRefundApi,
+  getPaymentStatusApi,
+} from "@/lib/api";
+
+interface OrderHistorial {
+  historial_id: number;
+  estado_anterior: string | null;
+  estado_nuevo: string;
+  notas: string | null;
+  fecha_cambio: string;
+}
 
 type OrderWithDetails = OrderDto & {
-  detalles: OrderDetailDto[];
+  items: OrderDetailDto[];
+  historial: OrderHistorial[];
 };
 import Link from "next/link";
 
@@ -68,6 +85,8 @@ export default function PedidoDetallePage() {
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -89,6 +108,75 @@ export default function PedidoDetallePage() {
 
     loadOrder();
   }, [id]);
+
+  const handleCancelOrder = async () => {
+    if (!order) return;
+
+    const confirmed = window.confirm(
+      "¿Estás seguro de que quieres cancelar este pedido?",
+    );
+    if (!confirmed) return;
+
+    setIsCanceling(true);
+    setCancelError(null);
+
+    try {
+      // 1. Verificar si el pedido tiene un pago exitoso con Culqi
+      let shouldRefund = false;
+      if (
+        order.estado_pago === "pagado" ||
+        order.estado_pago === "completado"
+      ) {
+        try {
+          const paymentStatus = await getPaymentStatusApi(order.pedido_id);
+          shouldRefund =
+            !!paymentStatus.culqi_charge_id &&
+            (paymentStatus.metodo_pago === "tarjeta" ||
+              paymentStatus.metodo_pago === "yape");
+        } catch (err) {
+          console.warn("No se pudo verificar el estado del pago:", err);
+        }
+      }
+
+      // 2. Si hay que hacer refund, hacerlo primero
+      if (shouldRefund) {
+        try {
+          await createCulqiRefundApi({
+            pedido_id: order.pedido_id,
+            reason: "solicitud_comprador",
+          });
+          console.log("Devolución procesada exitosamente");
+        } catch (refundErr: any) {
+          console.error("Error al procesar devolución:", refundErr);
+          // Continuar con la cancelación aunque falle el refund
+          // El admin puede procesar el refund manualmente
+        }
+      }
+
+      // 3. Cancelar el pedido
+      await cancelOrderApi(
+        order.pedido_id,
+        "Cancelado por el cliente desde el portal",
+      );
+
+      // 4. Recargar el pedido para mostrar el estado actualizado
+      const updatedOrder = await getOrderWithDetailsApi(order.pedido_id);
+      setOrder(updatedOrder);
+
+      alert(
+        shouldRefund
+          ? "Pedido cancelado. La devolución será procesada en 1-30 días según tu banco."
+          : "Pedido cancelado exitosamente.",
+      );
+    } catch (err: any) {
+      console.error("Error al cancelar pedido:", err);
+      setCancelError(
+        err.message || "No se pudo cancelar el pedido. Inténtalo de nuevo.",
+      );
+    } finally {
+      setIsCanceling(false);
+    }
+  };
 
   const formatPrice = (price: string | number) => {
     const amount = typeof price === "string" ? parseFloat(price) : price;
@@ -203,6 +291,68 @@ export default function PedidoDetallePage() {
             </CardContent>
           </Card>
 
+          {/* Cancelación del pedido */}
+          {order.estado_pedido !== "cancelado" &&
+            order.estado_pedido !== "completado" && (
+              <Card>
+                <CardContent className="pt-6">
+                  {order.estado_pedido === "recibido" ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Puedes cancelar tu pedido mientras esté en estado
+                        &quot;Recibido&quot;. Si ya realizaste el pago, la
+                        devolución será procesada automáticamente.
+                      </p>
+                      {cancelError && (
+                        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded text-sm">
+                          {cancelError}
+                        </div>
+                      )}
+                      <Button
+                        variant="destructive"
+                        onClick={handleCancelOrder}
+                        disabled={isCanceling}
+                        className="w-full sm:w-auto"
+                      >
+                        {isCanceling ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Cancelando...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Cancelar Pedido
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Tu pedido ya está en proceso. Para cancelarlo, por favor
+                        contáctanos por WhatsApp.
+                      </p>
+                      <Button
+                        variant="outline"
+                        asChild
+                        className="w-full sm:w-auto"
+                      >
+                        <a
+                          href="https://wa.me/51940241024?text=Hola,%20necesito%20cancelar%20mi%20pedido"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          Contactar por WhatsApp
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
           {/* Productos */}
           <Card>
             <CardHeader>
@@ -210,28 +360,57 @@ export default function PedidoDetallePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.detalles?.map((item) => (
+                {order.items?.map((item) => (
                   <div
                     key={item.detalle_id}
-                    className="flex justify-between items-center py-2"
+                    className="flex justify-between items-center py-3 border-b last:border-0"
                   >
-                    <div>
+                    <div className="space-y-1">
                       <p className="font-medium">{item.nombre_producto}</p>
                       <p className="text-sm text-muted-foreground">
-                        {item.cantidad} x {formatPrice(item.precio_unitario)}
+                        Cantidad: {item.cantidad} &middot; Precio unit.:{" "}
+                        {formatPrice(item.precio_unitario)}
                       </p>
+                      {item.personalizacion && (
+                        <p className="text-xs text-muted-foreground italic">
+                          Personalización:{" "}
+                          {Object.entries(item.personalizacion)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(", ")}
+                        </p>
+                      )}
                     </div>
-                    <p className="font-semibold">
+                    <p className="font-semibold text-right">
                       {formatPrice(item.subtotal)}
                     </p>
                   </div>
                 ))}
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span className="text-primary">
-                    {formatPrice(order.total)}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatPrice(order.subtotal)}</span>
+                  </div>
+                  {order.tipo_entrega === "delivery" &&
+                    parseFloat(order.total) > parseFloat(order.subtotal) && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Delivery</span>
+                        <span>
+                          {formatPrice(
+                            String(
+                              parseFloat(order.total) -
+                                parseFloat(order.subtotal),
+                            ),
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total</span>
+                    <span className="text-primary">
+                      {formatPrice(order.total)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -243,16 +422,31 @@ export default function PedidoDetallePage() {
               <CardTitle>Información de Entrega</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Tipo de Entrega</p>
-                <p className="font-medium capitalize">
-                  {order.tipo_entrega.replace("_", " ")}
-                </p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Tipo de Entrega
+                  </p>
+                  <p className="font-medium capitalize">
+                    {order.tipo_entrega === "delivery"
+                      ? "Delivery"
+                      : "Recojo en tienda"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Método de Pago
+                  </p>
+                  <p className="font-medium capitalize">{order.metodo_pago}</p>
+                </div>
               </div>
               {order.direccion_entrega && (
                 <div>
                   <p className="text-sm text-muted-foreground">Dirección</p>
-                  <p className="font-medium">{order.direccion_entrega}</p>
+                  <p className="font-medium">
+                    {order.direccion_entrega}
+                    {order.distrito_entrega && `, ${order.distrito_entrega}`}
+                  </p>
                 </div>
               )}
               {order.notas_cliente && (
@@ -263,6 +457,46 @@ export default function PedidoDetallePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Historial */}
+          {order.historial && order.historial.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial del Pedido</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {order.historial.map((h) => {
+                    const info =
+                      statusConfig[h.estado_nuevo] || statusConfig.recibido;
+                    return (
+                      <div
+                        key={h.historial_id}
+                        className="flex items-start gap-3"
+                      >
+                        <div
+                          className={`mt-0.5 rounded-full p-1.5 ${info.color}`}
+                        >
+                          <info.icon className="h-3 w-3" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{info.label}</p>
+                          {h.notas && (
+                            <p className="text-xs text-muted-foreground">
+                              {h.notas}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(h.fecha_cambio)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
     </div>

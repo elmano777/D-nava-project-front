@@ -46,7 +46,7 @@ interface OrderHistorialDto {
 }
 
 type OrderWithDetails = OrderDto & {
-  detalles: OrderDetailDto[];
+  items: OrderDetailDto[];
   historial?: OrderHistorialDto[];
 };
 
@@ -118,6 +118,29 @@ export default function AdminOrderDetailPage() {
 
     loadOrder();
   }, [id]);
+
+  const getValidNextStatuses = (currentStatus: string): string[] => {
+    switch (currentStatus) {
+      case "recibido":
+        return ["en_preparacion", "cancelado"];
+      case "en_preparacion":
+        return ["listo", "cancelado"];
+      case "listo":
+        return ["completado"];
+      case "completado":
+        return []; // No se puede cambiar desde completado
+      case "cancelado":
+        return []; // No se puede cambiar desde cancelado
+      default:
+        return [
+          "recibido",
+          "en_preparacion",
+          "listo",
+          "completado",
+          "cancelado",
+        ];
+    }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!order) return;
@@ -234,12 +257,12 @@ export default function AdminOrderDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5" />
-                    Productos ({order.detalles?.length || 0})
+                    Productos ({order.items?.length || 0})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {order.detalles?.map((item) => (
+                    {order.items?.map((item) => (
                       <div
                         key={item.detalle_id}
                         className="flex justify-between items-center py-3 border-b last:border-0"
@@ -326,24 +349,50 @@ export default function AdminOrderDetailPage() {
                   <CardTitle>Cambiar Estado</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Select
-                    value={order.estado_pedido}
-                    onValueChange={handleStatusChange}
-                    disabled={isUpdating}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="recibido">Recibido</SelectItem>
-                      <SelectItem value="en_preparacion">
-                        En Preparación
-                      </SelectItem>
-                      <SelectItem value="listo">Listo para Recoger</SelectItem>
-                      <SelectItem value="completado">Completado</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {getValidNextStatuses(order.estado_pedido).length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      No se puede cambiar el estado desde {statusInfo.label}
+                    </div>
+                  ) : (
+                    <Select
+                      value={order.estado_pedido}
+                      onValueChange={handleStatusChange}
+                      disabled={isUpdating}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getValidNextStatuses(order.estado_pedido).includes(
+                          "recibido",
+                        ) && <SelectItem value="recibido">Recibido</SelectItem>}
+                        {getValidNextStatuses(order.estado_pedido).includes(
+                          "en_preparacion",
+                        ) && (
+                          <SelectItem value="en_preparacion">
+                            En Preparación
+                          </SelectItem>
+                        )}
+                        {getValidNextStatuses(order.estado_pedido).includes(
+                          "listo",
+                        ) && (
+                          <SelectItem value="listo">
+                            Listo para Recoger
+                          </SelectItem>
+                        )}
+                        {getValidNextStatuses(order.estado_pedido).includes(
+                          "completado",
+                        ) && (
+                          <SelectItem value="completado">Completado</SelectItem>
+                        )}
+                        {getValidNextStatuses(order.estado_pedido).includes(
+                          "cancelado",
+                        ) && (
+                          <SelectItem value="cancelado">Cancelado</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </CardContent>
               </Card>
 

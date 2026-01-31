@@ -153,11 +153,15 @@ export default function ClienteDashboardPage() {
                         id: String(product.producto_id),
                         name: product.nombre,
                         description: product.descripcion_breve || "",
+                        fullDescription: product.descripcion_completa || "",
+                        ingredients: product.ingredientes || "",
                         price_in_cents: Math.round(
                           parseFloat(product.precio_base) * 100,
                         ),
                         image_url:
                           product.imagenes?.[0]?.url_s3 || "/placeholder.jpg",
+                        images:
+                          product.imagenes?.map((img) => img.url_s3) || [],
                         stock: product.control_stock
                           ? product.stock_actual || 0
                           : 999,

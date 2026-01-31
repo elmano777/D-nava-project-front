@@ -53,15 +53,27 @@ export default function NewProductPage() {
 
   useEffect(() => {
     const user = getStoredUser();
+    console.log("👤 Usuario actual:", user);
+
     if (!user || user.rol !== "administrador") {
+      console.log("❌ No es administrador, redirigiendo...");
       router.push("/auth/login");
       return;
     }
 
+    console.log("📋 Cargando categorías...");
     // Cargar categorías
     listCategoriesApi({ active: true })
-      .then(setCategories)
-      .catch(console.error);
+      .then((data) => {
+        console.log("✅ Categorías recibidas:", data);
+        setCategories(data);
+      })
+      .catch((err) => {
+        console.error("❌ Error al cargar categorías:", err);
+        setError(
+          "Error al cargar las categorías. Por favor, recarga la página.",
+        );
+      });
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,7 +90,8 @@ export default function NewProductPage() {
       };
 
       if (descripcionBreve) payload.descripcion_breve = descripcionBreve;
-      if (descripcionCompleta) payload.descripcion_completa = descripcionCompleta;
+      if (descripcionCompleta)
+        payload.descripcion_completa = descripcionCompleta;
       if (ingredientes) payload.ingredientes = ingredientes;
       if (controlStock) {
         payload.control_stock = true;
@@ -87,7 +100,9 @@ export default function NewProductPage() {
       if (tienePersonalizacion && opcionesPersonalizacion) {
         payload.tiene_personalizacion = true;
         try {
-          payload.opciones_personalizacion = JSON.parse(opcionesPersonalizacion);
+          payload.opciones_personalizacion = JSON.parse(
+            opcionesPersonalizacion,
+          );
         } catch {
           setError("El JSON de opciones de personalización no es válido");
           setIsLoading(false);
@@ -141,18 +156,35 @@ export default function NewProductPage() {
               {/* Categoría */}
               <div className="space-y-2">
                 <Label htmlFor="categoria">Categoría *</Label>
-                <Select value={categoriaId} onValueChange={setCategoriaId} required>
+                <Select
+                  value={categoriaId}
+                  onValueChange={setCategoriaId}
+                  required
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.categoria_id} value={String(cat.categoria_id)}>
+                      <SelectItem
+                        key={cat.categoria_id}
+                        value={String(cat.categoria_id)}
+                      >
                         {cat.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-sm text-muted-foreground">
+                  Mostrando categorías activas. Para agregar más, activa
+                  categorías en{" "}
+                  <Link
+                    href="/admin/categories"
+                    className="text-primary hover:underline"
+                  >
+                    Gestión de Categorías
+                  </Link>
+                </p>
               </div>
 
               {/* Precio */}
@@ -183,7 +215,9 @@ export default function NewProductPage() {
 
               {/* Descripción completa */}
               <div className="space-y-2">
-                <Label htmlFor="descripcion_completa">Descripción completa</Label>
+                <Label htmlFor="descripcion_completa">
+                  Descripción completa
+                </Label>
                 <Textarea
                   id="descripcion_completa"
                   value={descripcionCompleta}
@@ -224,7 +258,10 @@ export default function NewProductPage() {
                     Activar control de inventario
                   </p>
                 </div>
-                <Switch checked={controlStock} onCheckedChange={setControlStock} />
+                <Switch
+                  checked={controlStock}
+                  onCheckedChange={setControlStock}
+                />
               </div>
 
               {/* Stock actual (si control_stock está activo) */}
@@ -259,7 +296,9 @@ export default function NewProductPage() {
               {/* Opciones de personalización (si está activo) */}
               {tienePersonalizacion && (
                 <div className="space-y-2">
-                  <Label htmlFor="opciones">Opciones de personalización (JSON)</Label>
+                  <Label htmlFor="opciones">
+                    Opciones de personalización (JSON)
+                  </Label>
                   <Textarea
                     id="opciones"
                     value={opcionesPersonalizacion}

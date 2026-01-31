@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import {
   ShoppingBag,
@@ -17,10 +24,18 @@ import {
   Store,
   Truck,
   User,
+  MapPin,
+  Plus,
 } from "lucide-react";
 import { decodeJwt } from "@/lib/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { createOrderApi, type CreateOrderItemPayload } from "@/lib/api";
+import {
+  createOrderApi,
+  type CreateOrderItemPayload,
+  getAddressesApi,
+  createAddressApi,
+  AddressDto,
+} from "@/lib/api";
 import {
   useCartStore,
   MINIMUM_ORDER_AMOUNT,
@@ -31,12 +46,25 @@ import {
 export default function CheckoutPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [addresses, setAddresses] = useState<AddressDto[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(
+    null,
+  );
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     address: "",
     city: "",
+  });
+  const [newAddressForm, setNewAddressForm] = useState({
+    alias: "",
+    direccion_linea1: "",
+    direccion_linea2: "",
+    distrito: "",
+    ciudad: "Lima",
+    codigo_postal: "",
   });
 
   const {
@@ -52,13 +80,46 @@ export default function CheckoutPage() {
   useEffect(() => {
     const jwtData = decodeJwt();
     if (jwtData) {
+      // Formatear teléfono: remover +51 y formatear solo los dígitos
+      const rawPhone = (jwtData.telefono || "").replace(/^\+51/, "");
+      const digits = rawPhone.replace(/[^\d]/g, "").slice(0, 9);
+      const formattedPhone = digits.replace(
+        /(\d{3})(\d{0,3})(\d{0,3})/,
+        (_, a, b, c) => [a, b, c].filter(Boolean).join(" "),
+      );
+
       setFormData((prev) => ({
         ...prev,
         name: jwtData.nombre_completo || "",
         email: jwtData.email || "",
-        phone: jwtData.telefono || "",
+        phone: formattedPhone,
       }));
     }
+  }, []);
+
+  // Cargar direcciones guardadas
+  useEffect(() => {
+    const loadAddresses = async () => {
+      try {
+        const data = await getAddressesApi();
+        setAddresses(data);
+
+        // Auto-seleccionar la dirección predeterminada
+        const defaultAddress = data.find((addr) => addr.es_predeterminada);
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.direccion_id);
+          setFormData((prev) => ({
+            ...prev,
+            address: defaultAddress.direccion_linea1,
+            city: defaultAddress.distrito,
+          }));
+        }
+      } catch (error) {
+        console.error("Error cargando direcciones:", error);
+      }
+    };
+
+    loadAddresses();
   }, []);
 
   useEffect(() => {
@@ -92,6 +153,13 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validar que el teléfono tenga 9 dígitos
+    const phoneDigits = formData.phone.replace(/\s/g, "");
+    if (phoneDigits.length !== 9) {
+      alert("El teléfono debe tener 9 dígitos");
+      return;
+    }
+
     if (deliveryType === "delivery" && (!formData.address || !formData.city)) {
       alert("Por favor completa la dirección de entrega");
       return;
@@ -112,7 +180,7 @@ export default function CheckoutPage() {
 
       const order = await createOrderApi({
         nombre_cliente: formData.name,
-        telefono_cliente: formData.phone,
+        telefono_cliente: `+51${formData.phone.replace(/\s/g, "")}`,
         email_cliente: formData.email,
         tipo_entrega: deliveryType,
         direccion_entrega:
@@ -121,7 +189,7 @@ export default function CheckoutPage() {
           deliveryType === "delivery" ? formData.city : undefined,
         fecha_hora_programada: fechaProgramada,
         notas_cliente: undefined,
-        metodo_pago: "tarjeta",
+        metodo_pago: "tarjeta", // se actualiza después del pago real en /payment
         items: orderItems,
       });
 
@@ -154,6 +222,61 @@ export default function CheckoutPage() {
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Extraer solo dígitos
+    const raw = e.target.value.replace(/[^\d]/g, "");
+
+    // Formatear automáticamente: 928 750 445 (grupos de 3-3-3)
+    const formatted = raw
+      .slice(0, 9)
+      .replace(/(\d{3})(\d{0,3})(\d{0,3})/, (_, a, b, c) =>
+        [a, b, c].filter(Boolean).join(" "),
+      );
+
+    setFormData((prev) => ({ ...prev, phone: formatted }));
+  };
+
+  const handleSelectAddress = (addressId: number) => {
+    const address = addresses.find((addr) => addr.direccion_id === addressId);
+    if (address) {
+      setSelectedAddressId(addressId);
+      setFormData((prev) => ({
+        ...prev,
+        address: address.direccion_linea1,
+        city: address.distrito,
+      }));
+    }
+  };
+
+  const handleCreateNewAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const newAddress = await createAddressApi(newAddressForm);
+      setAddresses((prev) => [...prev, newAddress]);
+      setSelectedAddressId(newAddress.direccion_id);
+      setFormData((prev) => ({
+        ...prev,
+        address: newAddress.direccion_linea1,
+        city: newAddress.distrito,
+      }));
+      setIsDialogOpen(false);
+
+      // Reset form
+      setNewAddressForm({
+        alias: "",
+        direccion_linea1: "",
+        direccion_linea2: "",
+        distrito: "",
+        ciudad: "Lima",
+        codigo_postal: "",
+      });
+    } catch (error) {
+      console.error("Error creando dirección:", error);
+      alert("No se pudo crear la dirección. Intenta nuevamente.");
+    }
   };
 
   if (items.length === 0) {
@@ -284,42 +407,207 @@ export default function CheckoutPage() {
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="phone">Teléfono *</Label>
-                          <Input
-                            id="phone"
-                            name="phone"
-                            type="tel"
-                            placeholder="999 999 999"
-                            required
-                            value={formData.phone}
-                            onChange={handleInputChange}
-                          />
+                          <div className="flex gap-2">
+                            <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground select-none">
+                              +51
+                            </div>
+                            <Input
+                              id="phone"
+                              name="phone"
+                              type="tel"
+                              placeholder="928 750 445"
+                              maxLength={11}
+                              required
+                              value={formData.phone}
+                              onChange={handlePhoneChange}
+                            />
+                          </div>
                         </div>
                       </div>
 
                       {deliveryType === "delivery" && (
                         <>
-                          <div className="grid gap-2">
-                            <Label htmlFor="address">Dirección *</Label>
-                            <Input
-                              id="address"
-                              name="address"
-                              placeholder="Av. Principal 123"
-                              required
-                              value={formData.address}
-                              onChange={handleInputChange}
-                            />
-                          </div>
+                          <div className="grid gap-3">
+                            <Label>Dirección de Entrega *</Label>
 
-                          <div className="grid gap-2">
-                            <Label htmlFor="city">Distrito *</Label>
-                            <Input
-                              id="city"
-                              name="city"
-                              placeholder="Lima"
-                              required
-                              value={formData.city}
-                              onChange={handleInputChange}
-                            />
+                            {addresses.length > 0 && (
+                              <RadioGroup
+                                value={
+                                  selectedAddressId
+                                    ? String(selectedAddressId)
+                                    : ""
+                                }
+                                onValueChange={(value) =>
+                                  handleSelectAddress(Number(value))
+                                }
+                                className="space-y-2"
+                              >
+                                {addresses.map((address) => (
+                                  <div
+                                    key={address.direccion_id}
+                                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                                      selectedAddressId === address.direccion_id
+                                        ? "border-primary bg-primary/5"
+                                        : "hover:border-muted-foreground/50"
+                                    }`}
+                                    onClick={() =>
+                                      handleSelectAddress(address.direccion_id)
+                                    }
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <RadioGroupItem
+                                        value={String(address.direccion_id)}
+                                        id={`addr-${address.direccion_id}`}
+                                        className="mt-0.5"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <MapPin className="h-4 w-4 text-primary" />
+                                          <span className="font-medium">
+                                            {address.alias}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                          {address.direccion_linea1}
+                                          {address.direccion_linea2 &&
+                                            `, ${address.direccion_linea2}`}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          {address.distrito}, {address.ciudad}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            )}
+
+                            <Dialog
+                              open={isDialogOpen}
+                              onOpenChange={setIsDialogOpen}
+                            >
+                              <DialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full"
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Agregar Nueva Dirección
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle>Nueva Dirección</DialogTitle>
+                                </DialogHeader>
+                                <form
+                                  onSubmit={handleCreateNewAddress}
+                                  className="space-y-4"
+                                >
+                                  <div>
+                                    <Label htmlFor="new-alias">
+                                      Nombre / Alias *
+                                    </Label>
+                                    <Input
+                                      id="new-alias"
+                                      placeholder="Casa, Trabajo, Universidad..."
+                                      value={newAddressForm.alias}
+                                      onChange={(e) =>
+                                        setNewAddressForm({
+                                          ...newAddressForm,
+                                          alias: e.target.value,
+                                        })
+                                      }
+                                      required
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor="new-direccion">
+                                      Dirección (Calle y Número) *
+                                    </Label>
+                                    <Input
+                                      id="new-direccion"
+                                      placeholder="Av. Javier Prado 123"
+                                      value={newAddressForm.direccion_linea1}
+                                      onChange={(e) =>
+                                        setNewAddressForm({
+                                          ...newAddressForm,
+                                          direccion_linea1: e.target.value,
+                                        })
+                                      }
+                                      required
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor="new-referencia">
+                                      Referencia / Dpto (Opcional)
+                                    </Label>
+                                    <Input
+                                      id="new-referencia"
+                                      placeholder="Dpto 301, Edificio B..."
+                                      value={newAddressForm.direccion_linea2}
+                                      onChange={(e) =>
+                                        setNewAddressForm({
+                                          ...newAddressForm,
+                                          direccion_linea2: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label htmlFor="new-distrito">
+                                        Distrito *
+                                      </Label>
+                                      <Input
+                                        id="new-distrito"
+                                        placeholder="San Isidro"
+                                        value={newAddressForm.distrito}
+                                        onChange={(e) =>
+                                          setNewAddressForm({
+                                            ...newAddressForm,
+                                            distrito: e.target.value,
+                                          })
+                                        }
+                                        required
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <Label htmlFor="new-codigo">
+                                        Código Postal *
+                                      </Label>
+                                      <Input
+                                        id="new-codigo"
+                                        placeholder="15073"
+                                        value={newAddressForm.codigo_postal}
+                                        onChange={(e) =>
+                                          setNewAddressForm({
+                                            ...newAddressForm,
+                                            codigo_postal: e.target.value,
+                                          })
+                                        }
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex justify-end gap-2 pt-4">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setIsDialogOpen(false)}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                    <Button type="submit">Crear</Button>
+                                  </div>
+                                </form>
+                              </DialogContent>
+                            </Dialog>
                           </div>
                         </>
                       )}

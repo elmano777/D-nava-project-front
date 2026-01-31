@@ -41,7 +41,7 @@ export default function ConsultarPedidoPage() {
         return;
       }
 
-      router.push(`/order/${order.pedido_id}`);
+      router.push(`/cliente/pedido/${order.pedido_id}`);
     } catch (error) {
       setError("Error al buscar el pedido. Por favor intenta nuevamente.");
       setIsLoading(false);

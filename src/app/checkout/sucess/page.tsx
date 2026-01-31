@@ -70,7 +70,9 @@ export default function SuccessPage() {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button asChild className="flex-1">
-                  <Link href={`/order/${orderId}`}>Ver Estado del Pedido</Link>
+                  <Link href={`/cliente/pedido/${orderId}`}>
+                    Ver Estado del Pedido
+                  </Link>
                 </Button>
                 <Button
                   asChild

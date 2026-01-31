@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+const DESTINATARIO = "dnavapasteleria@gmail.com";
+const REMITENTE = "Libro de Reclamaciones <reclamaciones@mail.dnava-api.com>";
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
-    // Formatear la fecha actual
     const fecha = new Date().toLocaleString("es-PE", {
       timeZone: "America/Lima",
       year: "numeric",
@@ -14,98 +19,71 @@ export async function POST(request: NextRequest) {
       minute: "2-digit",
     });
 
-    // Crear el contenido del email
-    const emailContent = `
-LIBRO DE RECLAMACIONES - HOJA N° ${Date.now()}
-FECHA: ${fecha}
+    const numeroRegistro = Date.now();
 
-===========================================
-PROVEEDOR: NAVARRO JANCACHAGUA JHONN ROBERT
-RUC: 10212741740
-DOMICILIO: Av. Jorge Díaz Velásquez S/N, Mz. G Lt. 2A, Piso 1, Dpto. 1, AA.HH. UPIS San José – Lurín, Lima
-===========================================
+    // Email al negocio
+    await resend.emails.send({
+      from: REMITENTE,
+      to: [DESTINATARIO],
+      subject: `Nuevo ${data.tipoReclamacion === "reclamo" ? "Reclamo" : "Queja"} - Hoja N° ${numeroRegistro}`,
+      html: `
+        <h2>LIBRO DE RECLAMACIONES - HOJA N° ${numeroRegistro}</h2>
+        <p><strong>Fecha:</strong> ${fecha}</p>
+        <hr />
+        <h3>1. Identificación del Consumidor</h3>
+        <table style="border-collapse:collapse;width:100%">
+          <tr><td style="padding:4px 8px"><strong>Nombre:</strong></td><td>${data.nombre}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>DNI / CE:</strong></td><td>${data.dni}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>Domicilio:</strong></td><td>${data.domicilio}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>Teléfono:</strong></td><td>${data.telefono}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>E-mail:</strong></td><td>${data.email}</td></tr>
+          ${data.nombreTutor ? `<tr><td style="padding:4px 8px"><strong>Apoderado:</strong></td><td>${data.nombreTutor}</td></tr>` : ""}
+        </table>
+        <h3>2. Bien Contratado</h3>
+        <table style="border-collapse:collapse;width:100%">
+          <tr><td style="padding:4px 8px"><strong>Tipo:</strong></td><td>${data.tipoContratacion === "producto" ? "Producto" : "Servicio"}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>Monto reclamado:</strong></td><td>S/ ${data.montoReclamado}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>Descripción:</strong></td><td>${data.descripcion}</td></tr>
+        </table>
+        <h3>3. Detalle de la ${data.tipoReclamacion === "reclamo" ? "Reclamación" : "Queja"}</h3>
+        <p><strong>Tipo:</strong> ${data.tipoReclamacion === "reclamo" ? "RECLAMO - Disconformidad relacionada a los productos o servicios." : "QUEJA - Disconformidad no relacionada a los productos o servicios."}</p>
+        <p><strong>Detalle:</strong></p>
+        <p style="background:#f5f5f5;padding:12px;border-radius:4px">${data.detalle}</p>
+        <p><strong>Pedido del consumidor:</strong></p>
+        <p style="background:#f5f5f5;padding:12px;border-radius:4px">${data.pedido}</p>
+      `,
+    });
 
-1. IDENTIFICACIÓN DEL CONSUMIDOR RECLAMANTE
--------------------------------------------
-NOMBRE: ${data.nombre}
-DNI / CE: ${data.dni}
-DOMICILIO: ${data.domicilio}
-TELÉFONO: ${data.telefono}
-E-MAIL: ${data.email}
-${data.nombreTutor ? `PADRE, MADRE O APODERADO: ${data.nombreTutor}` : ""}
-
-2. IDENTIFICACIÓN DEL BIEN CONTRATADO
--------------------------------------
-TIPO: ${data.tipoContratacion === "producto" ? "PRODUCTO" : "SERVICIO"}
-MONTO RECLAMADO: S/ ${data.montoReclamado}
-DESCRIPCIÓN: ${data.descripcion}
-
-3. DETALLE DE LA RECLAMACIÓN Y PEDIDO DEL CONSUMIDOR
---------------------------------------------------
-TIPO: ${data.tipoReclamacion === "reclamo" ? "RECLAMO" : "QUEJA"}
-
-${data.tipoReclamacion === "reclamo"
-  ? "RECLAMO: Disconformidad relacionada a los productos o servicios."
-  : "QUEJA: Disconformidad no relacionada a los productos o servicios; o malestar o descontento respecto a la atención al público."}
-
-DETALLE:
-${data.detalle}
-
-PEDIDO DEL CONSUMIDOR:
-${data.pedido}
-
-===========================================
-INFORMACIÓN IMPORTANTE:
-- La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI.
-- El proveedor debe dar respuesta al reclamo o queja en un plazo no mayor a quince (15) días hábiles, el cual es improrrogable.
-===========================================
-
-Este reclamo fue enviado desde: www.dnava-api.com
-Fecha y hora de recepción: ${fecha}
-    `.trim();
-
-    // En un entorno de producción, aquí enviarías el email
-    // Por ahora, guardaremos en un log o archivo
-    console.log("NUEVO RECLAMO RECIBIDO:");
-    console.log(emailContent);
-
-    // Aquí iría la lógica de envío de email
-    // Opción 1: Usar nodemailer (necesitarías configurar SMTP)
-    // Opción 2: Usar un servicio como SendGrid, Resend, etc.
-    // Opción 3: Guardar en base de datos
-
-    // Por ahora, simulamos el envío exitoso
-    // TODO: Implementar envío real de email
-
-    // Enviar email de confirmación al usuario
-    const confirmacionUsuario = `
-Estimado/a ${data.nombre},
-
-Hemos recibido su ${data.tipoReclamacion === "reclamo" ? "reclamo" : "queja"} correctamente.
-
-Número de registro: ${Date.now()}
-Fecha de recepción: ${fecha}
-
-De acuerdo con la normativa vigente, daremos respuesta a su ${data.tipoReclamacion === "reclamo" ? "reclamo" : "queja"} en un plazo no mayor a 15 días hábiles.
-
-La respuesta será enviada a este mismo correo electrónico.
-
-Atentamente,
-D'Nava Panadería y Pastelería
-RUC: 10212741740
-Teléfono: +51 940 241 024
-    `.trim();
-
-    console.log("\nCONFIRMACIÓN AL USUARIO:");
-    console.log(confirmacionUsuario);
+    // Email de confirmación al usuario
+    await resend.emails.send({
+      from: REMITENTE,
+      to: [data.email],
+      subject: `Confirmación de ${data.tipoReclamacion === "reclamo" ? "reclamo" : "queja"} - D'Nava`,
+      html: `
+        <h2>Hemos recibido su ${data.tipoReclamacion === "reclamo" ? "reclamo" : "queja"}</h2>
+        <p>Estimado/a <strong>${data.nombre}</strong>,</p>
+        <p>Le confirmamos que hemos recibido su ${data.tipoReclamacion === "reclamo" ? "reclamo" : "queja"} correctamente.</p>
+        <table style="border-collapse:collapse">
+          <tr><td style="padding:4px 8px"><strong>N° de registro:</strong></td><td>${numeroRegistro}</td></tr>
+          <tr><td style="padding:4px 8px"><strong>Fecha:</strong></td><td>${fecha}</td></tr>
+        </table>
+        <p>De acuerdo con la normativa vigente, daremos respuesta en un plazo no mayor a <strong>15 días hábiles</strong>.</p>
+        <p>La respuesta será enviada a este mismo correo electrónico.</p>
+        <br />
+        <p>Atentamente,</p>
+        <p><strong>D'Nava Panadería y Pastelería</strong><br />
+        RUC: 10212741740<br />
+        Teléfono: +51 940 241 024</p>
+      `,
+    });
 
     return NextResponse.json(
       {
         success: true,
         message: "Reclamo recibido exitosamente",
-        numeroRegistro: Date.now(),
+        numeroRegistro,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error al procesar el reclamo:", error);
@@ -114,7 +92,7 @@ Teléfono: +51 940 241 024
         success: false,
         message: "Error al procesar el reclamo",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

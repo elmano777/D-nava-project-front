@@ -5,8 +5,8 @@ import { ClienteNav } from "@/components/cliente/cliente-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { listOrdersApi, OrderDto } from "@/lib/api";
-import { Loader2, Package, Eye } from "lucide-react";
+import { listOrdersApi, cancelOrderApi, OrderDto } from "@/lib/api";
+import { Loader2, Package, Eye, XCircle } from "lucide-react";
 import Link from "next/link";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -32,6 +32,7 @@ export default function MisPedidosPage() {
   const [orders, setOrders] = useState<OrderDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState<number | null>(null);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -65,6 +66,33 @@ export default function MisPedidosPage() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (
+      !confirm(
+        "¿Estás seguro de cancelar este pedido? Esta acción no se puede deshacer.",
+      )
+    )
+      return;
+
+    setCancellingOrder(orderId);
+    try {
+      await cancelOrderApi(orderId, "Cancelado por el cliente");
+      // Recargar pedidos
+      const updatedOrders = await listOrdersApi();
+      setOrders(updatedOrders);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al cancelar el pedido";
+      alert(message);
+    } finally {
+      setCancellingOrder(null);
+    }
+  };
+
+  const canCancelOrder = (order: OrderDto) => {
+    return order.estado_pedido === "recibido";
   };
 
   return (
@@ -136,21 +164,45 @@ export default function MisPedidosPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          Tipo: {order.tipo_entrega.replace("_", " ")}
-                        </p>
-                        <p className="text-lg font-bold text-primary">
-                          {formatPrice(order.total)}
-                        </p>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Tipo: {order.tipo_entrega.replace("_", " ")}
+                          </p>
+                          <p className="text-lg font-bold text-primary">
+                            {formatPrice(order.total)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/cliente/pedido/${order.pedido_id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver Detalles
+                            </Link>
+                          </Button>
+                          {canCancelOrder(order) && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleCancelOrder(order.pedido_id)}
+                              disabled={cancellingOrder === order.pedido_id}
+                            >
+                              {cancellingOrder === order.pedido_id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Cancelando...
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Cancelar
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/cliente/pedido/${order.pedido_id}`}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver Detalles
-                        </Link>
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>

@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Edit } from "lucide-react";
 import Link from "next/link";
 
 interface Product {
@@ -26,9 +27,13 @@ interface Product {
 
 interface ProductsTableProps {
   products: Product[];
+  onToggleDisponible: (id: number, currentState: boolean) => void;
 }
 
-export function ProductsTable({ products }: ProductsTableProps) {
+export function ProductsTable({
+  products,
+  onToggleDisponible,
+}: ProductsTableProps) {
   const formatPrice = (precio: string) => {
     return new Intl.NumberFormat("es-PE", {
       style: "currency",
@@ -73,18 +78,28 @@ export function ProductsTable({ products }: ProductsTableProps) {
                     : "Sin control"}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={product.disponible ? "default" : "secondary"}>
-                    {product.disponible ? "Activo" : "Inactivo"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={product.disponible}
+                      onCheckedChange={() =>
+                        onToggleDisponible(
+                          product.producto_id,
+                          product.disponible,
+                        )
+                      }
+                    />
+                    <Badge
+                      variant={product.disponible ? "default" : "secondary"}
+                    >
+                      {product.disponible ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </div>
                 </TableCell>
-                <TableCell className="text-right space-x-2">
+                <TableCell className="text-right">
                   <Button asChild variant="ghost" size="sm">
                     <Link href={`/admin/products/${product.producto_id}`}>
                       <Edit className="h-4 w-4" />
                     </Link>
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </TableCell>
               </TableRow>

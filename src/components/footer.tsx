@@ -1,8 +1,20 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Instagram, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { listCategoriesPublicApi, CategoryDto } from "@/lib/api";
 
 export function Footer() {
+  const [categories, setCategories] = useState<CategoryDto[]>([]);
+
+  useEffect(() => {
+    listCategoriesPublicApi({ active: true })
+      .then((data) => setCategories(data.slice(0, 4)))
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className="border-t border-border/50 bg-muted/20">
       <div className="container mx-auto px-4 max-w-7xl py-16">
@@ -78,38 +90,16 @@ export function Footer() {
               Categorías
             </h3>
             <ul className="space-y-3">
-              <li>
-                <Link
-                  href="/productos?categoria=pasteles"
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm"
-                >
-                  Pasteles
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/productos?categoria=panes"
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm"
-                >
-                  Panes
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/productos?categoria=tortas"
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm"
-                >
-                  Tortas
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/productos?categoria=galletas"
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm"
-                >
-                  Galletas
-                </Link>
-              </li>
+              {categories.map((cat) => (
+                <li key={cat.categoria_id}>
+                  <Link
+                    href={`/productos?categoria=${encodeURIComponent(cat.nombre.toLowerCase())}`}
+                    className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                  >
+                    {cat.nombre}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
