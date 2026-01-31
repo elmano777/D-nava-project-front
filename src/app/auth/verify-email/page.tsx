@@ -15,10 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
 
-export default function VerifyEmailPage() {
+function VerifyEmailForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const emailParam = searchParams.get("email");
@@ -58,9 +58,7 @@ export default function VerifyEmailPage() {
       setCountdown(60); // 60 segundos de espera
     } catch (error: unknown) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Error al reenviar el código";
+        error instanceof Error ? error.message : "Error al reenviar el código";
       setError(message);
     } finally {
       setIsResending(false);
@@ -197,5 +195,25 @@ export default function VerifyEmailPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen w-full items-center justify-center p-6">
+          <div className="w-full max-w-sm">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">Cargando...</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <VerifyEmailForm />
+    </Suspense>
   );
 }

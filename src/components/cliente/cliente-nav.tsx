@@ -98,10 +98,9 @@ export function ClienteNav() {
               <User className="h-4 w-4" />
               <span>{user?.nombre_completo || user?.email || "Cliente"}</span>
               {profile?.email_verificado && (
-                <CheckCircle2
-                  className="h-4 w-4 text-green-600"
-                  title="Email verificado"
-                />
+                <span title="Email verificado">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </span>
               )}
             </div>
 

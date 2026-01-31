@@ -35,7 +35,7 @@ interface OrderHistorial {
 
 type OrderWithDetails = OrderDto & {
   items: OrderDetailDto[];
-  historial: OrderHistorial[];
+  historial?: OrderHistorial[];
 };
 import Link from "next/link";
 

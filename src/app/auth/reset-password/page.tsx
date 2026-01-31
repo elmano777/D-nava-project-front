@@ -16,10 +16,10 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { ArrowLeft, Lock, CheckCircle2, AlertCircle } from "lucide-react";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tokenParam = searchParams.get("token");
@@ -34,7 +34,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (!tokenParam) {
       setError(
-        "Token inválido o expirado. Por favor solicita un nuevo enlace de recuperación."
+        "Token inválido o expirado. Por favor solicita un nuevo enlace de recuperación.",
       );
     }
   }, [tokenParam]);
@@ -96,9 +96,7 @@ export default function ResetPasswordPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Lock className="h-6 w-6 text-primary" />
-              <CardTitle className="text-2xl">
-                Restablecer Contraseña
-              </CardTitle>
+              <CardTitle className="text-2xl">Restablecer Contraseña</CardTitle>
             </div>
             <CardDescription>
               Ingresa tu nueva contraseña para recuperar el acceso a tu cuenta
@@ -177,9 +175,7 @@ export default function ResetPasswordPage() {
                     className="w-full"
                     disabled={isLoading || !tokenParam}
                   >
-                    {isLoading
-                      ? "Restableciendo..."
-                      : "Restablecer Contraseña"}
+                    {isLoading ? "Restableciendo..." : "Restablecer Contraseña"}
                   </Button>
 
                   {!tokenParam && (
@@ -209,5 +205,25 @@ export default function ResetPasswordPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen w-full items-center justify-center p-6">
+          <div className="w-full max-w-sm">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">Cargando...</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
