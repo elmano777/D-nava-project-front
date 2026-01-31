@@ -580,11 +580,11 @@ export async function sendTestNotificationApi(payload: {
 // ====== Reports ======
 
 export interface SalesStatsResponse {
-  total_ingresos: number;
+  ingresos_totales: string; // Backend devuelve como string
   total_pedidos: number;
   pedidos_completados: number;
   pedidos_cancelados: number;
-  ticket_promedio: number;
+  ticket_promedio: string; // Backend devuelve como string
   tasa_conversion: number;
 }
 

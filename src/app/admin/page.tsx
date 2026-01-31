@@ -128,7 +128,7 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatPrice(stats?.total_ingresos || 0)}
+                {formatPrice(parseFloat(stats?.ingresos_totales || "0"))}
               </div>
             </CardContent>
           </Card>
@@ -208,7 +208,7 @@ export default function AdminPage() {
                   Ticket Promedio
                 </span>
                 <span className="font-semibold">
-                  {formatPrice(stats?.ticket_promedio || 0)}
+                  {formatPrice(parseFloat(stats?.ticket_promedio || "0"))}
                 </span>
               </div>
               <div className="flex justify-between items-center">
