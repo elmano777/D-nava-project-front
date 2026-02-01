@@ -42,6 +42,8 @@ import {
   DELIVERY_COST,
   type DeliveryType,
 } from "@/store/cart-store";
+import { AddressMapPicker } from "@/components/maps/address-map-picker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -430,184 +432,475 @@ export default function CheckoutPage() {
                           <div className="grid gap-3">
                             <Label>Dirección de Entrega *</Label>
 
-                            {addresses.length > 0 && (
-                              <RadioGroup
-                                value={
-                                  selectedAddressId
-                                    ? String(selectedAddressId)
-                                    : ""
-                                }
-                                onValueChange={(value) =>
-                                  handleSelectAddress(Number(value))
-                                }
-                                className="space-y-2"
+                            <Tabs defaultValue="saved" className="w-full">
+                              <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="saved">
+                                  Mis Direcciones
+                                </TabsTrigger>
+                                <TabsTrigger value="quick">
+                                  <MapPin className="mr-2 h-4 w-4" />
+                                  Ubicación Actual
+                                </TabsTrigger>
+                              </TabsList>
+
+                              <TabsContent
+                                value="saved"
+                                className="space-y-3 mt-3"
                               >
-                                {addresses.map((address) => (
-                                  <div
-                                    key={address.direccion_id}
-                                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                                      selectedAddressId === address.direccion_id
-                                        ? "border-primary bg-primary/5"
-                                        : "hover:border-muted-foreground/50"
-                                    }`}
-                                    onClick={() =>
-                                      handleSelectAddress(address.direccion_id)
+                                {addresses.length > 0 ? (
+                                  <RadioGroup
+                                    value={
+                                      selectedAddressId
+                                        ? String(selectedAddressId)
+                                        : ""
                                     }
+                                    onValueChange={(value) =>
+                                      handleSelectAddress(Number(value))
+                                    }
+                                    className="space-y-2"
                                   >
-                                    <div className="flex items-start gap-2">
-                                      <RadioGroupItem
-                                        value={String(address.direccion_id)}
-                                        id={`addr-${address.direccion_id}`}
-                                        className="mt-0.5"
-                                      />
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <MapPin className="h-4 w-4 text-primary" />
-                                          <span className="font-medium">
-                                            {address.alias}
-                                          </span>
+                                    {addresses.map((address) => (
+                                      <div
+                                        key={address.direccion_id}
+                                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                                          selectedAddressId ===
+                                          address.direccion_id
+                                            ? "border-primary bg-primary/5"
+                                            : "hover:border-muted-foreground/50"
+                                        }`}
+                                        onClick={() =>
+                                          handleSelectAddress(
+                                            address.direccion_id,
+                                          )
+                                        }
+                                      >
+                                        <div className="flex items-start gap-2">
+                                          <RadioGroupItem
+                                            value={String(address.direccion_id)}
+                                            id={`addr-${address.direccion_id}`}
+                                            className="mt-0.5"
+                                          />
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <MapPin className="h-4 w-4 text-primary" />
+                                              <span className="font-medium">
+                                                {address.alias}
+                                              </span>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                              {address.direccion_linea1}
+                                              {address.direccion_linea2 &&
+                                                `, ${address.direccion_linea2}`}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                              {address.distrito},{" "}
+                                              {address.ciudad}
+                                            </p>
+                                          </div>
                                         </div>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                          {address.direccion_linea1}
-                                          {address.direccion_linea2 &&
-                                            `, ${address.direccion_linea2}`}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                          {address.distrito}, {address.ciudad}
-                                        </p>
                                       </div>
-                                    </div>
+                                    ))}
+                                  </RadioGroup>
+                                ) : (
+                                  <div className="text-center py-6 text-muted-foreground">
+                                    <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                    <p>No tienes direcciones guardadas</p>
                                   </div>
-                                ))}
-                              </RadioGroup>
-                            )}
+                                )}
 
-                            <Dialog
-                              open={isDialogOpen}
-                              onOpenChange={setIsDialogOpen}
-                            >
-                              <DialogTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="w-full"
+                                <Dialog
+                                  open={isDialogOpen}
+                                  onOpenChange={setIsDialogOpen}
                                 >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  Agregar Nueva Dirección
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-md">
-                                <DialogHeader>
-                                  <DialogTitle>Nueva Dirección</DialogTitle>
-                                </DialogHeader>
-                                <form
-                                  onSubmit={handleCreateNewAddress}
-                                  className="space-y-4"
-                                >
-                                  <div>
-                                    <Label htmlFor="new-alias">
-                                      Nombre / Alias *
-                                    </Label>
-                                    <Input
-                                      id="new-alias"
-                                      placeholder="Casa, Trabajo, Universidad..."
-                                      value={newAddressForm.alias}
-                                      onChange={(e) =>
-                                        setNewAddressForm({
-                                          ...newAddressForm,
-                                          alias: e.target.value,
-                                        })
-                                      }
-                                      required
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="new-direccion">
-                                      Dirección (Calle y Número) *
-                                    </Label>
-                                    <Input
-                                      id="new-direccion"
-                                      placeholder="Av. Javier Prado 123"
-                                      value={newAddressForm.direccion_linea1}
-                                      onChange={(e) =>
-                                        setNewAddressForm({
-                                          ...newAddressForm,
-                                          direccion_linea1: e.target.value,
-                                        })
-                                      }
-                                      required
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="new-referencia">
-                                      Referencia / Dpto (Opcional)
-                                    </Label>
-                                    <Input
-                                      id="new-referencia"
-                                      placeholder="Dpto 301, Edificio B..."
-                                      value={newAddressForm.direccion_linea2}
-                                      onChange={(e) =>
-                                        setNewAddressForm({
-                                          ...newAddressForm,
-                                          direccion_linea2: e.target.value,
-                                        })
-                                      }
-                                    />
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <Label htmlFor="new-distrito">
-                                        Distrito *
-                                      </Label>
-                                      <Input
-                                        id="new-distrito"
-                                        placeholder="San Isidro"
-                                        value={newAddressForm.distrito}
-                                        onChange={(e) =>
-                                          setNewAddressForm({
-                                            ...newAddressForm,
-                                            distrito: e.target.value,
-                                          })
-                                        }
-                                        required
-                                      />
-                                    </div>
-
-                                    <div>
-                                      <Label htmlFor="new-codigo">
-                                        Código Postal *
-                                      </Label>
-                                      <Input
-                                        id="new-codigo"
-                                        placeholder="15073"
-                                        value={newAddressForm.codigo_postal}
-                                        onChange={(e) =>
-                                          setNewAddressForm({
-                                            ...newAddressForm,
-                                            codigo_postal: e.target.value,
-                                          })
-                                        }
-                                        required
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="flex justify-end gap-2 pt-4">
+                                  <DialogTrigger asChild>
                                     <Button
                                       type="button"
                                       variant="outline"
-                                      onClick={() => setIsDialogOpen(false)}
+                                      className="w-full"
                                     >
-                                      Cancelar
+                                      <Plus className="mr-2 h-4 w-4" />
+                                      Agregar Nueva Dirección
                                     </Button>
-                                    <Button type="submit">Crear</Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>
+                                        ¿Dónde quieres recibir tu pedido?
+                                      </DialogTitle>
+                                    </DialogHeader>
+                                    <form
+                                      onSubmit={handleCreateNewAddress}
+                                      className="space-y-4"
+                                    >
+                                      <div className="space-y-4">
+                                        <p className="text-sm text-muted-foreground">
+                                          Marca tu ubicación en el mapa o busca
+                                          tu dirección
+                                        </p>
+                                        <AddressMapPicker
+                                          onAddressSelect={(address) => {
+                                            setNewAddressForm({
+                                              ...newAddressForm,
+                                              direccion_linea1:
+                                                address.direccion_linea1,
+                                              distrito: address.distrito,
+                                              ciudad: address.ciudad,
+                                              codigo_postal:
+                                                address.codigo_postal,
+                                            });
+                                          }}
+                                        />
+
+                                        <div>
+                                          <Label htmlFor="new-alias-map">
+                                            Nombre / Alias *
+                                          </Label>
+                                          <Input
+                                            id="new-alias-map"
+                                            placeholder="Casa, Trabajo, Universidad..."
+                                            value={newAddressForm.alias}
+                                            onChange={(e) =>
+                                              setNewAddressForm({
+                                                ...newAddressForm,
+                                                alias: e.target.value,
+                                              })
+                                            }
+                                            required
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="new-referencia-map">
+                                            Referencia / Dpto (Opcional)
+                                          </Label>
+                                          <Input
+                                            id="new-referencia-map"
+                                            placeholder="Dpto 301, Edificio B..."
+                                            value={
+                                              newAddressForm.direccion_linea2
+                                            }
+                                            onChange={(e) =>
+                                              setNewAddressForm({
+                                                ...newAddressForm,
+                                                direccion_linea2:
+                                                  e.target.value,
+                                              })
+                                            }
+                                          />
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-4">
+                                          <div>
+                                            <Label>Distrito</Label>
+                                            <Input
+                                              value={newAddressForm.distrito}
+                                              readOnly
+                                              className="bg-muted"
+                                            />
+                                          </div>
+                                          <div>
+                                            <Label>Ciudad</Label>
+                                            <Input
+                                              value={newAddressForm.ciudad}
+                                              readOnly
+                                              className="bg-muted"
+                                            />
+                                          </div>
+                                          <div>
+                                            <Label>Código Postal</Label>
+                                            <Input
+                                              value={
+                                                newAddressForm.codigo_postal
+                                              }
+                                              readOnly
+                                              className="bg-muted"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div>
+                                          <Label>Dirección</Label>
+                                          <Input
+                                            value={
+                                              newAddressForm.direccion_linea1
+                                            }
+                                            readOnly
+                                            className="bg-muted"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="new-alias">
+                                          Nombre / Alias *
+                                        </Label>
+                                        <Input
+                                          id="new-alias"
+                                          placeholder="Casa, Trabajo, Universidad..."
+                                          value={newAddressForm.alias}
+                                          onChange={(e) =>
+                                            setNewAddressForm({
+                                              ...newAddressForm,
+                                              alias: e.target.value,
+                                            })
+                                          }
+                                          required
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="new-direccion">
+                                          Dirección (Calle y Número) *
+                                        </Label>
+                                        <Input
+                                          id="new-direccion"
+                                          placeholder="Av. Javier Prado 123"
+                                          value={
+                                            newAddressForm.direccion_linea1
+                                          }
+                                          onChange={(e) =>
+                                            setNewAddressForm({
+                                              ...newAddressForm,
+                                              direccion_linea1: e.target.value,
+                                            })
+                                          }
+                                          required
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="new-referencia">
+                                          Referencia / Dpto (Opcional)
+                                        </Label>
+                                        <Input
+                                          id="new-referencia"
+                                          placeholder="Dpto 301, Edificio B..."
+                                          value={
+                                            newAddressForm.direccion_linea2
+                                          }
+                                          onChange={(e) =>
+                                            setNewAddressForm({
+                                              ...newAddressForm,
+                                              direccion_linea2: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <Label htmlFor="new-distrito">
+                                            Distrito *
+                                          </Label>
+                                          <Input
+                                            id="new-distrito"
+                                            placeholder="San Isidro"
+                                            value={newAddressForm.distrito}
+                                            onChange={(e) =>
+                                              setNewAddressForm({
+                                                ...newAddressForm,
+                                                distrito: e.target.value,
+                                              })
+                                            }
+                                            required
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="new-codigo">
+                                            Código Postal *
+                                          </Label>
+                                          <Input
+                                            id="new-codigo"
+                                            placeholder="15073"
+                                            value={newAddressForm.codigo_postal}
+                                            onChange={(e) =>
+                                              setNewAddressForm({
+                                                ...newAddressForm,
+                                                codigo_postal: e.target.value,
+                                              })
+                                            }
+                                            required
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="flex justify-end gap-2 pt-4">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => setIsDialogOpen(false)}
+                                        >
+                                          Cancelar
+                                        </Button>
+                                        <Button type="submit">Crear</Button>
+                                      </div>
+                                    </form>
+                                  </DialogContent>
+                                </Dialog>
+                              </TabsContent>
+
+                              <TabsContent
+                                value="quick"
+                                className="space-y-3 mt-3"
+                              >
+                                <div className="border rounded-lg p-4 space-y-3">
+                                  <div className="flex items-start gap-3">
+                                    <div className="p-2 bg-primary/10 rounded-lg">
+                                      <MapPin className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <h4 className="font-medium mb-1">
+                                        Usar mi ubicación actual
+                                      </h4>
+                                      <p className="text-sm text-muted-foreground mb-3">
+                                        Detectaremos tu ubicación
+                                        automáticamente para hacer el pedido más
+                                        rápido
+                                      </p>
+                                      <Dialog
+                                        open={isDialogOpen}
+                                        onOpenChange={setIsDialogOpen}
+                                      >
+                                        <DialogTrigger asChild>
+                                          <Button className="w-full">
+                                            <MapPin className="mr-2 h-4 w-4" />
+                                            Marcar en el Mapa
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                          <DialogHeader>
+                                            <DialogTitle>
+                                              ¿Dónde quieres recibir tu pedido?
+                                            </DialogTitle>
+                                          </DialogHeader>
+                                          <form
+                                            onSubmit={handleCreateNewAddress}
+                                            className="space-y-4"
+                                          >
+                                            <div className="space-y-4">
+                                              <p className="text-sm text-muted-foreground">
+                                                Marca tu ubicación en el mapa o
+                                                busca tu dirección
+                                              </p>
+                                              <AddressMapPicker
+                                                onAddressSelect={(address) => {
+                                                  setNewAddressForm({
+                                                    ...newAddressForm,
+                                                    direccion_linea1:
+                                                      address.direccion_linea1,
+                                                    distrito: address.distrito,
+                                                    ciudad: address.ciudad,
+                                                    codigo_postal:
+                                                      address.codigo_postal,
+                                                  });
+                                                }}
+                                              />
+
+                                              <div>
+                                                <Label htmlFor="quick-alias">
+                                                  Nombre / Alias *
+                                                </Label>
+                                                <Input
+                                                  id="quick-alias"
+                                                  placeholder="Casa, Trabajo, Universidad..."
+                                                  value={newAddressForm.alias}
+                                                  onChange={(e) =>
+                                                    setNewAddressForm({
+                                                      ...newAddressForm,
+                                                      alias: e.target.value,
+                                                    })
+                                                  }
+                                                  required
+                                                />
+                                              </div>
+
+                                              <div>
+                                                <Label htmlFor="quick-referencia">
+                                                  Referencia / Dpto (Opcional)
+                                                </Label>
+                                                <Input
+                                                  id="quick-referencia"
+                                                  placeholder="Dpto 301, Edificio B, Frente al parque..."
+                                                  value={
+                                                    newAddressForm.direccion_linea2
+                                                  }
+                                                  onChange={(e) =>
+                                                    setNewAddressForm({
+                                                      ...newAddressForm,
+                                                      direccion_linea2:
+                                                        e.target.value,
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+
+                                              <div className="grid grid-cols-3 gap-4">
+                                                <div>
+                                                  <Label>Distrito</Label>
+                                                  <Input
+                                                    value={
+                                                      newAddressForm.distrito
+                                                    }
+                                                    readOnly
+                                                    className="bg-muted"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <Label>Ciudad</Label>
+                                                  <Input
+                                                    value={
+                                                      newAddressForm.ciudad
+                                                    }
+                                                    readOnly
+                                                    className="bg-muted"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <Label>Código Postal</Label>
+                                                  <Input
+                                                    value={
+                                                      newAddressForm.codigo_postal
+                                                    }
+                                                    readOnly
+                                                    className="bg-muted"
+                                                  />
+                                                </div>
+                                              </div>
+
+                                              <div>
+                                                <Label>Dirección</Label>
+                                                <Input
+                                                  value={
+                                                    newAddressForm.direccion_linea1
+                                                  }
+                                                  readOnly
+                                                  className="bg-muted"
+                                                />
+                                              </div>
+                                            </div>
+
+                                            <div className="flex justify-end gap-2 pt-4">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() =>
+                                                  setIsDialogOpen(false)
+                                                }
+                                              >
+                                                Cancelar
+                                              </Button>
+                                              <Button type="submit">
+                                                Guardar y Usar
+                                              </Button>
+                                            </div>
+                                          </form>
+                                        </DialogContent>
+                                      </Dialog>
+                                    </div>
                                   </div>
-                                </form>
-                              </DialogContent>
-                            </Dialog>
+                                </div>
+                              </TabsContent>
+                            </Tabs>
                           </div>
                         </>
                       )}

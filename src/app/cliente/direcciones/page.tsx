@@ -35,6 +35,8 @@ import {
   AddressDto,
 } from "@/lib/api";
 import { toast } from "sonner";
+import { AddressMapPicker } from "@/components/maps/address-map-picker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function DireccionesPage() {
   const router = useRouter();
@@ -182,103 +184,200 @@ export default function DireccionesPage() {
                 Nueva Dirección
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {isEditing ? "Editar Dirección" : "Nueva Dirección"}
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="alias">Nombre / Alias *</Label>
-                  <Input
-                    id="alias"
-                    placeholder="Casa, Trabajo, Universidad..."
-                    value={formData.alias}
-                    onChange={(e) =>
-                      setFormData({ ...formData, alias: e.target.value })
-                    }
-                    required
-                  />
-                </div>
+                <Tabs defaultValue="map" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="map">
+                      <MapPin className="mr-2 h-4 w-4" />
+                      Usar Mapa
+                    </TabsTrigger>
+                    <TabsTrigger value="manual">
+                      Escribir Manualmente
+                    </TabsTrigger>
+                  </TabsList>
 
-                <div>
-                  <Label htmlFor="direccion_linea1">
-                    Dirección (Calle y Número) *
-                  </Label>
-                  <Input
-                    id="direccion_linea1"
-                    placeholder="Av. Javier Prado 123"
-                    value={formData.direccion_linea1}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        direccion_linea1: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="direccion_linea2">
-                    Referencia / Dpto (Opcional)
-                  </Label>
-                  <Input
-                    id="direccion_linea2"
-                    placeholder="Dpto 301, Edificio B..."
-                    value={formData.direccion_linea2}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        direccion_linea2: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="distrito">Distrito *</Label>
-                    <Input
-                      id="distrito"
-                      placeholder="San Isidro"
-                      value={formData.distrito}
-                      onChange={(e) =>
-                        setFormData({ ...formData, distrito: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="codigo_postal">Código Postal *</Label>
-                    <Input
-                      id="codigo_postal"
-                      placeholder="15073"
-                      value={formData.codigo_postal}
-                      onChange={(e) =>
+                  <TabsContent value="map" className="space-y-4">
+                    <AddressMapPicker
+                      onAddressSelect={(address) => {
                         setFormData({
                           ...formData,
-                          codigo_postal: e.target.value,
-                        })
-                      }
-                      required
+                          direccion_linea1: address.direccion_linea1,
+                          distrito: address.distrito,
+                          ciudad: address.ciudad,
+                          codigo_postal: address.codigo_postal,
+                        });
+                      }}
                     />
-                  </div>
-                </div>
 
-                <div>
-                  <Label htmlFor="ciudad">Ciudad *</Label>
-                  <Input
-                    id="ciudad"
-                    value={formData.ciudad}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ciudad: e.target.value })
-                    }
-                    required
-                  />
-                </div>
+                    <div>
+                      <Label htmlFor="alias-map">Nombre / Alias *</Label>
+                      <Input
+                        id="alias-map"
+                        placeholder="Casa, Trabajo, Universidad..."
+                        value={formData.alias}
+                        onChange={(e) =>
+                          setFormData({ ...formData, alias: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="direccion_linea2-map">
+                        Referencia / Dpto (Opcional)
+                      </Label>
+                      <Input
+                        id="direccion_linea2-map"
+                        placeholder="Dpto 301, Edificio B..."
+                        value={formData.direccion_linea2}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            direccion_linea2: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label>Distrito</Label>
+                        <Input
+                          value={formData.distrito}
+                          readOnly
+                          className="bg-muted"
+                        />
+                      </div>
+                      <div>
+                        <Label>Ciudad</Label>
+                        <Input
+                          value={formData.ciudad}
+                          readOnly
+                          className="bg-muted"
+                        />
+                      </div>
+                      <div>
+                        <Label>Código Postal</Label>
+                        <Input
+                          value={formData.codigo_postal}
+                          readOnly
+                          className="bg-muted"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Dirección</Label>
+                      <Input
+                        value={formData.direccion_linea1}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="manual" className="space-y-4">
+                    <div>
+                      <Label htmlFor="alias">Nombre / Alias *</Label>
+                      <Input
+                        id="alias"
+                        placeholder="Casa, Trabajo, Universidad..."
+                        value={formData.alias}
+                        onChange={(e) =>
+                          setFormData({ ...formData, alias: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="direccion_linea1">
+                        Dirección (Calle y Número) *
+                      </Label>
+                      <Input
+                        id="direccion_linea1"
+                        placeholder="Av. Javier Prado 123"
+                        value={formData.direccion_linea1}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            direccion_linea1: e.target.value,
+                          })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="direccion_linea2">
+                        Referencia / Dpto (Opcional)
+                      </Label>
+                      <Input
+                        id="direccion_linea2"
+                        placeholder="Dpto 301, Edificio B..."
+                        value={formData.direccion_linea2}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            direccion_linea2: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="distrito">Distrito *</Label>
+                        <Input
+                          id="distrito"
+                          placeholder="San Isidro"
+                          value={formData.distrito}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              distrito: e.target.value,
+                            })
+                          }
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="codigo_postal">Código Postal *</Label>
+                        <Input
+                          id="codigo_postal"
+                          placeholder="15073"
+                          value={formData.codigo_postal}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              codigo_postal: e.target.value,
+                            })
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="ciudad">Ciudad *</Label>
+                      <Input
+                        id="ciudad"
+                        value={formData.ciudad}
+                        onChange={(e) =>
+                          setFormData({ ...formData, ciudad: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button
