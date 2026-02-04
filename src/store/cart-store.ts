@@ -12,15 +12,17 @@ export interface CartItem {
 export type DeliveryType = "recojo_tienda" | "delivery";
 
 export const MINIMUM_ORDER_AMOUNT = 2; // 2 soles
-export const DELIVERY_COST = 5; // 5 soles
+export const DELIVERY_COST = 5; // 5 soles (precio base, se calculará dinámicamente)
 
 interface CartState {
   items: CartItem[];
   deliveryType: DeliveryType;
+  deliveryCost: number; // Costo dinámico de delivery
   addItem: (item: Omit<CartItem, "quantity">) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   setDeliveryType: (type: DeliveryType) => void;
+  setDeliveryCost: (cost: number) => void;
   clearCart: () => void;
   getTotalItems: () => number;
   getSubtotal: () => number;
@@ -32,7 +34,8 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      deliveryType: "recojo_tienda" as DeliveryType,
+      deliveryType: "delivery" as DeliveryType, // Por defecto delivery
+      deliveryCost: DELIVERY_COST, // Costo inicial
 
       addItem: (item) => {
         set((state) => {
@@ -74,8 +77,16 @@ export const useCartStore = create<CartState>()(
         set({ deliveryType: type });
       },
 
+      setDeliveryCost: (cost) => {
+        set({ deliveryCost: cost });
+      },
+
       clearCart: () => {
-        set({ items: [], deliveryType: "recojo_tienda" });
+        set({
+          items: [],
+          deliveryType: "delivery",
+          deliveryCost: DELIVERY_COST,
+        });
       },
 
       getTotalItems: () => {
@@ -90,7 +101,7 @@ export const useCartStore = create<CartState>()(
       },
 
       getDeliveryCost: () => {
-        return get().deliveryType === "delivery" ? DELIVERY_COST : 0;
+        return get().deliveryType === "delivery" ? get().deliveryCost : 0;
       },
 
       getTotal: () => {

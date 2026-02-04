@@ -42,17 +42,25 @@ import {
   DELIVERY_COST,
   type DeliveryType,
 } from "@/store/cart-store";
-import { AddressMapPicker } from "@/components/maps/address-map-picker";
+import {
+  AddressMapPicker,
+  type AddressComponents,
+} from "@/components/maps/address-map-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { calculateDeliveryDistanceByCoords } from "@/lib/distance-calculator";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
   const [addresses, setAddresses] = useState<AddressDto[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(
     null,
   );
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isNewAddressDialogOpen, setIsNewAddressDialogOpen] = useState(false);
+  const [isQuickAddressDialogOpen, setIsQuickAddressDialogOpen] =
+    useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -68,11 +76,22 @@ export default function CheckoutPage() {
     ciudad: "Lima",
     codigo_postal: "",
   });
+  const [tempCoordinates, setTempCoordinates] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  // Dirección seleccionada desde el mapa (para mostrar en la UI)
+  const [quickSelectedAddress, setQuickSelectedAddress] = useState<{
+    direccion: string;
+    distrito: string;
+    ciudad: string;
+  } | null>(null);
 
   const {
     items,
     deliveryType,
     setDeliveryType,
+    setDeliveryCost,
     getSubtotal,
     getDeliveryCost,
     getTotal,
@@ -240,7 +259,7 @@ export default function CheckoutPage() {
     setFormData((prev) => ({ ...prev, phone: formatted }));
   };
 
-  const handleSelectAddress = (addressId: number) => {
+  const handleSelectAddress = async (addressId: number) => {
     const address = addresses.find((addr) => addr.direccion_id === addressId);
     if (address) {
       setSelectedAddressId(addressId);
@@ -249,14 +268,102 @@ export default function CheckoutPage() {
         address: address.direccion_linea1,
         city: address.distrito,
       }));
+
+      // Calcular distancia usando la dirección completa
+      // Formato mejorado para geocodificación
+      const fullAddress = `${address.direccion_linea1}, ${address.distrito}, Lima, Perú`;
+
+      setIsCalculatingDistance(true);
+      setDistanceError(null);
+
+      try {
+        const { calculateDeliveryDistance } =
+          await import("@/lib/distance-calculator");
+        const result = await calculateDeliveryDistance(fullAddress);
+
+        if (!result.isWithinCoverage) {
+          setDistanceError(
+            `Lo sentimos, no realizamos entregas a más de 8 km. Esta dirección está a ${result.distanceInKm.toFixed(1)} km.`,
+          );
+          setDeliveryCost(0);
+        } else {
+          setDeliveryCost(result.deliveryCost);
+        }
+      } catch (error: any) {
+        // Si no se puede geocodificar (Geocoding API no habilitada),
+        // usar costo por defecto del primer tier
+        console.warn(
+          `No se pudo calcular distancia para dirección guardada. Usando tarifa base de S/ 5.00`,
+        );
+        console.log("Dirección:", fullAddress);
+        console.log("Error:", error.message);
+
+        setDeliveryCost(5); // Costo del primer tier (0-1km)
+
+        // NO mostrar error al usuario, el delivery funcionará con tarifa base
+        // Para cálculo exacto, el usuario debe usar "Ubicación Actual" con el mapa
+        setDistanceError(null);
+      } finally {
+        setIsCalculatingDistance(false);
+      }
     }
   };
 
-  const handleCreateNewAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const calculateAndSetDeliveryCost = async (lat: number, lng: number) => {
+    setIsCalculatingDistance(true);
+    setDistanceError(null);
 
     try {
+      const result = await calculateDeliveryDistanceByCoords(lat, lng);
+
+      if (!result.isWithinCoverage) {
+        setDistanceError(
+          `Lo sentimos, no realizamos entregas a más de 8 km. Tu dirección está a ${result.distanceInKm.toFixed(1)} km.`,
+        );
+        setDeliveryCost(0);
+        return false;
+      }
+
+      setDeliveryCost(result.deliveryCost);
+      return true;
+    } catch (error) {
+      console.error("Error calculando distancia:", error);
+      setDistanceError("No se pudo calcular la distancia. Intenta nuevamente.");
+      setDeliveryCost(5); // Costo por defecto
+      return false;
+    } finally {
+      setIsCalculatingDistance(false);
+    }
+  };
+
+  // Función para guardar dirección en la base de datos (Mis Direcciones)
+  const handleCreateNewAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (
+      !newAddressForm.alias ||
+      !newAddressForm.direccion_linea1 ||
+      !newAddressForm.distrito
+    ) {
+      alert(
+        "Por favor completa los campos obligatorios: Alias, Dirección y Distrito",
+      );
+      return;
+    }
+
+    if (tempCoordinates) {
+      console.log("Coordenadas detectadas:", tempCoordinates);
+      await calculateAndSetDeliveryCost(
+        tempCoordinates.lat,
+        tempCoordinates.lng,
+      );
+    }
+
+    try {
+      console.log("Creando dirección con datos:", newAddressForm);
       const newAddress = await createAddressApi(newAddressForm);
+      console.log("Dirección creada:", newAddress);
       setAddresses((prev) => [...prev, newAddress]);
       setSelectedAddressId(newAddress.direccion_id);
       setFormData((prev) => ({
@@ -264,7 +371,8 @@ export default function CheckoutPage() {
         address: newAddress.direccion_linea1,
         city: newAddress.distrito,
       }));
-      setIsDialogOpen(false);
+
+      setIsNewAddressDialogOpen(false);
 
       // Reset form
       setNewAddressForm({
@@ -275,9 +383,78 @@ export default function CheckoutPage() {
         ciudad: "Lima",
         codigo_postal: "",
       });
-    } catch (error) {
+      setTempCoordinates(null);
+    } catch (error: any) {
       console.error("Error creando dirección:", error);
+      console.error(
+        "Detalles del error:",
+        error?.response?.data || error?.message,
+      );
       alert("No se pudo crear la dirección. Intenta nuevamente.");
+    }
+  };
+
+  // Función para usar dirección temporal (Otra ubicación) - Guarda en BD con es_temporal: true
+  const handleUseQuickAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!newAddressForm.direccion_linea1 || !newAddressForm.distrito) {
+      alert("Por favor selecciona una ubicación en el mapa");
+      return;
+    }
+
+    if (tempCoordinates) {
+      console.log("Coordenadas detectadas:", tempCoordinates);
+      await calculateAndSetDeliveryCost(
+        tempCoordinates.lat,
+        tempCoordinates.lng,
+      );
+    }
+
+    try {
+      // Guardar en BD con esTemporal: true (no aparecerá en "Mis Direcciones")
+      const tempAddress = await createAddressApi({
+        alias: "Dirección temporal",
+        direccion_linea1: newAddressForm.direccion_linea1,
+        direccion_linea2: newAddressForm.direccion_linea2 || undefined,
+        distrito: newAddressForm.distrito,
+        ciudad: newAddressForm.ciudad,
+        codigo_postal: newAddressForm.codigo_postal || undefined,
+        es_temporal: true, // 🔑 Marca como temporal
+      });
+
+      console.log("Dirección temporal creada:", tempAddress);
+
+      setSelectedAddressId(null); // Deseleccionar direcciones guardadas
+      setFormData((prev) => ({
+        ...prev,
+        address: tempAddress.direccion_linea1,
+        city: tempAddress.distrito,
+      }));
+
+      // Guardar para mostrar en la UI
+      setQuickSelectedAddress({
+        direccion: tempAddress.direccion_linea1,
+        distrito: tempAddress.distrito,
+        ciudad: tempAddress.ciudad,
+      });
+
+      setIsQuickAddressDialogOpen(false);
+
+      // Reset form
+      setNewAddressForm({
+        alias: "",
+        direccion_linea1: "",
+        direccion_linea2: "",
+        distrito: "",
+        ciudad: "Lima",
+        codigo_postal: "",
+      });
+      setTempCoordinates(null);
+    } catch (error: any) {
+      console.error("Error creando dirección temporal:", error);
+      alert("No se pudo guardar la dirección. Intenta nuevamente.");
     }
   };
 
@@ -329,9 +506,10 @@ export default function CheckoutPage() {
                     onValueChange={(value) =>
                       setDeliveryType(value as DeliveryType)
                     }
-                    className="grid grid-cols-2 gap-4"
+                    className="grid grid-cols-1 gap-4"
                   >
-                    <div>
+                    {/* Temporalmente deshabilitado - solo delivery disponible */}
+                    {/* <div>
                       <RadioGroupItem
                         value="recojo_tienda"
                         id="recojo_tienda"
@@ -347,7 +525,7 @@ export default function CheckoutPage() {
                           Gratis
                         </span>
                       </Label>
-                    </div>
+                    </div> */}
                     <div>
                       <RadioGroupItem
                         value="delivery"
@@ -361,7 +539,9 @@ export default function CheckoutPage() {
                         <Truck className="mb-2 h-6 w-6" />
                         <span className="font-semibold">Delivery</span>
                         <span className="text-sm text-muted-foreground">
-                          S/ {DELIVERY_COST.toFixed(2)}
+                          {deliveryCost > 0
+                            ? `S/ ${deliveryCost.toFixed(2)}`
+                            : "Calcular según distancia"}
                         </span>
                       </Label>
                     </div>
@@ -429,6 +609,24 @@ export default function CheckoutPage() {
 
                       {deliveryType === "delivery" && (
                         <>
+                          {distanceError && (
+                            <Alert variant="destructive">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription>
+                                {distanceError}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
+                          {isCalculatingDistance && (
+                            <Alert>
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription>
+                                Calculando distancia y costo de delivery...
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
                           <div className="grid gap-3">
                             <Label>Dirección de Entrega *</Label>
 
@@ -439,7 +637,7 @@ export default function CheckoutPage() {
                                 </TabsTrigger>
                                 <TabsTrigger value="quick">
                                   <MapPin className="mr-2 h-4 w-4" />
-                                  Ubicación Actual
+                                  Otra ubicación
                                 </TabsTrigger>
                               </TabsList>
 
@@ -460,19 +658,15 @@ export default function CheckoutPage() {
                                     className="space-y-2"
                                   >
                                     {addresses.map((address) => (
-                                      <div
+                                      <label
                                         key={address.direccion_id}
-                                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                                        htmlFor={`addr-${address.direccion_id}`}
+                                        className={`border rounded-lg p-3 cursor-pointer transition-colors block ${
                                           selectedAddressId ===
                                           address.direccion_id
                                             ? "border-primary bg-primary/5"
                                             : "hover:border-muted-foreground/50"
                                         }`}
-                                        onClick={() =>
-                                          handleSelectAddress(
-                                            address.direccion_id,
-                                          )
-                                        }
                                       >
                                         <div className="flex items-start gap-2">
                                           <RadioGroupItem
@@ -498,7 +692,7 @@ export default function CheckoutPage() {
                                             </p>
                                           </div>
                                         </div>
-                                      </div>
+                                      </label>
                                     ))}
                                   </RadioGroup>
                                 ) : (
@@ -509,8 +703,8 @@ export default function CheckoutPage() {
                                 )}
 
                                 <Dialog
-                                  open={isDialogOpen}
-                                  onOpenChange={setIsDialogOpen}
+                                  open={isNewAddressDialogOpen}
+                                  onOpenChange={setIsNewAddressDialogOpen}
                                 >
                                   <DialogTrigger asChild>
                                     <Button
@@ -548,6 +742,13 @@ export default function CheckoutPage() {
                                               codigo_postal:
                                                 address.codigo_postal,
                                             });
+                                            // Guardar coordenadas si están disponibles
+                                            if (address.lat && address.lng) {
+                                              setTempCoordinates({
+                                                lat: address.lat,
+                                                lng: address.lng,
+                                              });
+                                            }
                                           }}
                                         />
 
@@ -589,138 +790,67 @@ export default function CheckoutPage() {
                                           />
                                         </div>
 
-                                        <div className="grid grid-cols-3 gap-4">
-                                          <div>
-                                            <Label>Distrito</Label>
-                                            <Input
-                                              value={newAddressForm.distrito}
-                                              readOnly
-                                              className="bg-muted"
-                                            />
-                                          </div>
-                                          <div>
-                                            <Label>Ciudad</Label>
-                                            <Input
-                                              value={newAddressForm.ciudad}
-                                              readOnly
-                                              className="bg-muted"
-                                            />
-                                          </div>
-                                          <div>
-                                            <Label>Código Postal</Label>
-                                            <Input
-                                              value={
-                                                newAddressForm.codigo_postal
-                                              }
-                                              readOnly
-                                              className="bg-muted"
-                                            />
-                                          </div>
-                                        </div>
-
                                         <div>
-                                          <Label>Dirección</Label>
+                                          <Label htmlFor="new-direccion-map">
+                                            Dirección (Calle y Número) *
+                                          </Label>
                                           <Input
+                                            id="new-direccion-map"
+                                            placeholder="Av. Javier Prado 123"
                                             value={
                                               newAddressForm.direccion_linea1
                                             }
-                                            readOnly
-                                            className="bg-muted"
-                                          />
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <Label htmlFor="new-alias">
-                                          Nombre / Alias *
-                                        </Label>
-                                        <Input
-                                          id="new-alias"
-                                          placeholder="Casa, Trabajo, Universidad..."
-                                          value={newAddressForm.alias}
-                                          onChange={(e) =>
-                                            setNewAddressForm({
-                                              ...newAddressForm,
-                                              alias: e.target.value,
-                                            })
-                                          }
-                                          required
-                                        />
-                                      </div>
-
-                                      <div>
-                                        <Label htmlFor="new-direccion">
-                                          Dirección (Calle y Número) *
-                                        </Label>
-                                        <Input
-                                          id="new-direccion"
-                                          placeholder="Av. Javier Prado 123"
-                                          value={
-                                            newAddressForm.direccion_linea1
-                                          }
-                                          onChange={(e) =>
-                                            setNewAddressForm({
-                                              ...newAddressForm,
-                                              direccion_linea1: e.target.value,
-                                            })
-                                          }
-                                          required
-                                        />
-                                      </div>
-
-                                      <div>
-                                        <Label htmlFor="new-referencia">
-                                          Referencia / Dpto (Opcional)
-                                        </Label>
-                                        <Input
-                                          id="new-referencia"
-                                          placeholder="Dpto 301, Edificio B..."
-                                          value={
-                                            newAddressForm.direccion_linea2
-                                          }
-                                          onChange={(e) =>
-                                            setNewAddressForm({
-                                              ...newAddressForm,
-                                              direccion_linea2: e.target.value,
-                                            })
-                                          }
-                                        />
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                          <Label htmlFor="new-distrito">
-                                            Distrito *
-                                          </Label>
-                                          <Input
-                                            id="new-distrito"
-                                            placeholder="San Isidro"
-                                            value={newAddressForm.distrito}
                                             onChange={(e) =>
                                               setNewAddressForm({
                                                 ...newAddressForm,
-                                                distrito: e.target.value,
+                                                direccion_linea1:
+                                                  e.target.value,
                                               })
                                             }
                                             required
                                           />
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Puedes editar si la dirección no es
+                                            exacta
+                                          </p>
                                         </div>
 
-                                        <div>
-                                          <Label htmlFor="new-codigo">
-                                            Código Postal *
-                                          </Label>
-                                          <Input
-                                            id="new-codigo"
-                                            placeholder="15073"
-                                            value={newAddressForm.codigo_postal}
-                                            onChange={(e) =>
-                                              setNewAddressForm({
-                                                ...newAddressForm,
-                                                codigo_postal: e.target.value,
-                                              })
-                                            }
-                                            required
-                                          />
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                            <Label htmlFor="new-distrito-map">
+                                              Distrito *
+                                            </Label>
+                                            <Input
+                                              id="new-distrito-map"
+                                              placeholder="San Isidro"
+                                              value={newAddressForm.distrito}
+                                              onChange={(e) =>
+                                                setNewAddressForm({
+                                                  ...newAddressForm,
+                                                  distrito: e.target.value,
+                                                })
+                                              }
+                                              required
+                                            />
+                                          </div>
+                                          <div>
+                                            <Label htmlFor="new-codigo-map">
+                                              Código Postal
+                                            </Label>
+                                            <Input
+                                              id="new-codigo-map"
+                                              placeholder="15073"
+                                              value={
+                                                newAddressForm.codigo_postal
+                                              }
+                                              onChange={(e) =>
+                                                setNewAddressForm({
+                                                  ...newAddressForm,
+                                                  codigo_postal: e.target.value,
+                                                })
+                                              }
+                                            />
+                                          </div>
                                         </div>
                                       </div>
 
@@ -728,7 +858,9 @@ export default function CheckoutPage() {
                                         <Button
                                           type="button"
                                           variant="outline"
-                                          onClick={() => setIsDialogOpen(false)}
+                                          onClick={() =>
+                                            setIsNewAddressDialogOpen(false)
+                                          }
                                         >
                                           Cancelar
                                         </Button>
@@ -749,22 +881,46 @@ export default function CheckoutPage() {
                                       <MapPin className="h-5 w-5 text-primary" />
                                     </div>
                                     <div className="flex-1">
-                                      <h4 className="font-medium mb-1">
-                                        Usar mi ubicación actual
-                                      </h4>
-                                      <p className="text-sm text-muted-foreground mb-3">
-                                        Detectaremos tu ubicación
-                                        automáticamente para hacer el pedido más
-                                        rápido
-                                      </p>
+                                      {/* Mostrar dirección seleccionada o botón para seleccionar */}
+                                      {quickSelectedAddress ? (
+                                        <div className="space-y-2">
+                                          <h4 className="font-medium">
+                                            Dirección seleccionada
+                                          </h4>
+                                          <div className="bg-muted/50 rounded-md p-3">
+                                            <p className="font-medium text-sm">
+                                              {quickSelectedAddress.direccion}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                              {quickSelectedAddress.distrito},{" "}
+                                              {quickSelectedAddress.ciudad}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <h4 className="font-medium mb-1">
+                                          Seleccionar ubicación en el mapa
+                                        </h4>
+                                      )}
                                       <Dialog
-                                        open={isDialogOpen}
-                                        onOpenChange={setIsDialogOpen}
+                                        open={isQuickAddressDialogOpen}
+                                        onOpenChange={
+                                          setIsQuickAddressDialogOpen
+                                        }
                                       >
                                         <DialogTrigger asChild>
-                                          <Button className="w-full">
+                                          <Button
+                                            className="w-full mt-2"
+                                            variant={
+                                              quickSelectedAddress
+                                                ? "outline"
+                                                : "default"
+                                            }
+                                          >
                                             <MapPin className="mr-2 h-4 w-4" />
-                                            Marcar en el Mapa
+                                            {quickSelectedAddress
+                                              ? "Seleccionar otra dirección"
+                                              : "Marcar en el Mapa"}
                                           </Button>
                                         </DialogTrigger>
                                         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -774,13 +930,14 @@ export default function CheckoutPage() {
                                             </DialogTitle>
                                           </DialogHeader>
                                           <form
-                                            onSubmit={handleCreateNewAddress}
+                                            onSubmit={handleUseQuickAddress}
                                             className="space-y-4"
                                           >
                                             <div className="space-y-4">
                                               <p className="text-sm text-muted-foreground">
                                                 Marca tu ubicación en el mapa o
-                                                busca tu dirección
+                                                busca tu dirección (solo para
+                                                este pedido)
                                               </p>
                                               <AddressMapPicker
                                                 onAddressSelect={(address) => {
@@ -793,25 +950,42 @@ export default function CheckoutPage() {
                                                     codigo_postal:
                                                       address.codigo_postal,
                                                   });
+                                                  // Guardar coordenadas si están disponibles
+                                                  if (
+                                                    address.lat &&
+                                                    address.lng
+                                                  ) {
+                                                    setTempCoordinates({
+                                                      lat: address.lat,
+                                                      lng: address.lng,
+                                                    });
+                                                  }
                                                 }}
                                               />
 
                                               <div>
-                                                <Label htmlFor="quick-alias">
-                                                  Nombre / Alias *
+                                                <Label htmlFor="quick-direccion">
+                                                  Dirección (Calle y Número) *
                                                 </Label>
                                                 <Input
-                                                  id="quick-alias"
-                                                  placeholder="Casa, Trabajo, Universidad..."
-                                                  value={newAddressForm.alias}
+                                                  id="quick-direccion"
+                                                  placeholder="Av. Javier Prado 123"
+                                                  value={
+                                                    newAddressForm.direccion_linea1
+                                                  }
                                                   onChange={(e) =>
                                                     setNewAddressForm({
                                                       ...newAddressForm,
-                                                      alias: e.target.value,
+                                                      direccion_linea1:
+                                                        e.target.value,
                                                     })
                                                   }
                                                   required
                                                 />
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  Puedes editar si la dirección
+                                                  no es exacta
+                                                </p>
                                               </div>
 
                                               <div>
@@ -834,48 +1008,46 @@ export default function CheckoutPage() {
                                                 />
                                               </div>
 
-                                              <div className="grid grid-cols-3 gap-4">
+                                              <div className="grid grid-cols-2 gap-4">
                                                 <div>
-                                                  <Label>Distrito</Label>
+                                                  <Label htmlFor="quick-distrito">
+                                                    Distrito *
+                                                  </Label>
                                                   <Input
+                                                    id="quick-distrito"
+                                                    placeholder="San Isidro"
                                                     value={
                                                       newAddressForm.distrito
                                                     }
-                                                    readOnly
-                                                    className="bg-muted"
-                                                  />
-                                                </div>
-                                                <div>
-                                                  <Label>Ciudad</Label>
-                                                  <Input
-                                                    value={
-                                                      newAddressForm.ciudad
+                                                    onChange={(e) =>
+                                                      setNewAddressForm({
+                                                        ...newAddressForm,
+                                                        distrito:
+                                                          e.target.value,
+                                                      })
                                                     }
-                                                    readOnly
-                                                    className="bg-muted"
+                                                    required
                                                   />
                                                 </div>
                                                 <div>
-                                                  <Label>Código Postal</Label>
+                                                  <Label htmlFor="quick-codigo">
+                                                    Código Postal
+                                                  </Label>
                                                   <Input
+                                                    id="quick-codigo"
+                                                    placeholder="15073"
                                                     value={
                                                       newAddressForm.codigo_postal
                                                     }
-                                                    readOnly
-                                                    className="bg-muted"
+                                                    onChange={(e) =>
+                                                      setNewAddressForm({
+                                                        ...newAddressForm,
+                                                        codigo_postal:
+                                                          e.target.value,
+                                                      })
+                                                    }
                                                   />
                                                 </div>
-                                              </div>
-
-                                              <div>
-                                                <Label>Dirección</Label>
-                                                <Input
-                                                  value={
-                                                    newAddressForm.direccion_linea1
-                                                  }
-                                                  readOnly
-                                                  className="bg-muted"
-                                                />
                                               </div>
                                             </div>
 
@@ -884,7 +1056,9 @@ export default function CheckoutPage() {
                                                 type="button"
                                                 variant="outline"
                                                 onClick={() =>
-                                                  setIsDialogOpen(false)
+                                                  setIsQuickAddressDialogOpen(
+                                                    false,
+                                                  )
                                                 }
                                               >
                                                 Cancelar
@@ -912,10 +1086,19 @@ export default function CheckoutPage() {
                       type="submit"
                       size="lg"
                       className="w-full"
-                      disabled={isLoading || !isMinimumMet}
+                      disabled={
+                        isLoading ||
+                        !isMinimumMet ||
+                        !!distanceError ||
+                        isCalculatingDistance
+                      }
                     >
                       <CreditCard className="mr-2 h-5 w-5" />
-                      {isLoading ? "Procesando..." : "Continuar al Pago"}
+                      {isLoading
+                        ? "Procesando..."
+                        : isCalculatingDistance
+                          ? "Calculando distancia..."
+                          : "Continuar al Pago"}
                     </Button>
                   </form>
                 </CardContent>

@@ -17,8 +17,7 @@ const contactInfo = [
   {
     icon: MapPin,
     label: "Ubicación",
-    value:
-      "Av. Jorge Díaz Velásquez S/N, Mz. G Lt. 2A, Piso 1, Dpto. 1, AA.HH. UPIS San José – Lurín, Lima",
+    value: "Retamas 479, Ate Salamanca",
   },
 ];
 

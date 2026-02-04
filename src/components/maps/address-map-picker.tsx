@@ -26,7 +26,7 @@ const defaultCenter = {
   lng: -77.0428,
 };
 
-interface AddressComponents {
+export interface AddressComponents {
   direccion_linea1: string;
   distrito: string;
   ciudad: string;
@@ -57,42 +57,28 @@ export function AddressMapPicker({
   const [searchValue, setSearchValue] = useState("");
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  const onLoad = useCallback(
-    (map: google.maps.Map) => {
-      setMap(map);
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
 
-      // Intentar obtener la ubicación actual automáticamente al cargar
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
+    // Solo centrar el mapa en la ubicación actual, sin auto-llenar la dirección
+    // El usuario debe buscar o hacer clic en el mapa para seleccionar su dirección
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
 
-            setMarkerPosition({ lat, lng });
-            map.panTo({ lat, lng });
-            map.setZoom(17);
-
-            // Geocodificación inversa para obtener la dirección
-            const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-              if (status === "OK" && results && results[0]) {
-                const addressComponents = extractAddressComponents(results[0]);
-                if (addressComponents) {
-                  onAddressSelect(addressComponents);
-                  setSearchValue(addressComponents.direccion_linea1);
-                }
-              }
-            });
-          },
-          (error) => {
-            console.log("No se pudo obtener ubicación automática:", error);
-            // No mostrar error, simplemente usar el centro por defecto
-          },
-        );
-      }
-    },
-    [onAddressSelect],
-  );
+          // Solo centrar el mapa, no colocar marcador ni llenar dirección
+          map.panTo({ lat, lng });
+          map.setZoom(15);
+        },
+        (error) => {
+          console.log("No se pudo obtener ubicación automática:", error);
+          // No mostrar error, simplemente usar el centro por defecto
+        },
+      );
+    }
+  }, []);
 
   const onUnmount = useCallback(() => {
     setMap(null);
@@ -154,21 +140,70 @@ export function AddressMapPicker({
     if (autocomplete) {
       const place = autocomplete.getPlace();
 
-      if (place.geometry?.location) {
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-
-        setMarkerPosition({ lat, lng });
-        map?.panTo({ lat, lng });
-        map?.setZoom(17);
-
-        const addressComponents = extractAddressComponents(place);
-        if (addressComponents) {
-          onAddressSelect(addressComponents);
+      // Validar que place y geometry existan (no existen si el usuario presiona Enter sin seleccionar una sugerencia)
+      if (!place || !place.geometry?.location) {
+        console.log(
+          "No se seleccionó un lugar válido del autocomplete, intentando búsqueda manual...",
+        );
+        // Intentar búsqueda manual con el texto ingresado
+        if (searchValue.trim()) {
+          handleManualSearch();
         }
+        return;
+      }
+
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+
+      setMarkerPosition({ lat, lng });
+      map?.panTo({ lat, lng });
+      map?.setZoom(17);
+
+      const addressComponents = extractAddressComponents(place);
+      if (addressComponents) {
+        onAddressSelect(addressComponents);
       }
     }
   };
+
+  // Búsqueda manual usando Geocoding API
+  const handleManualSearch = useCallback(() => {
+    if (!searchValue.trim()) return;
+
+    const geocoder = new google.maps.Geocoder();
+    const searchQuery =
+      searchValue.includes("Peru") || searchValue.includes("Perú")
+        ? searchValue
+        : `${searchValue}, Lima, Peru`;
+
+    geocoder.geocode(
+      {
+        address: searchQuery,
+        componentRestrictions: { country: "PE" },
+      },
+      (results, status) => {
+        if (status === "OK" && results && results[0]) {
+          const location = results[0].geometry.location;
+          const lat = location.lat();
+          const lng = location.lng();
+
+          setMarkerPosition({ lat, lng });
+          map?.panTo({ lat, lng });
+          map?.setZoom(17);
+
+          const addressComponents = extractAddressComponents(results[0]);
+          if (addressComponents) {
+            onAddressSelect(addressComponents);
+          }
+        } else {
+          console.error("No se encontró la dirección:", status);
+          alert(
+            "No se encontró la dirección. Intenta ser más específico o haz clic en el mapa.",
+          );
+        }
+      },
+    );
+  }, [searchValue, map, onAddressSelect]);
 
   const onMapClick = useCallback(
     (e: google.maps.MapMouseEvent) => {
@@ -239,7 +274,12 @@ export function AddressMapPicker({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Buscar dirección</Label>
+        <Label>
+          Buscar dirección{" "}
+          <span className="text-muted-foreground font-normal">
+            (usa las flechas ↑↓ para seleccionar)
+          </span>
+        </Label>
         <div className="flex gap-2">
           <Autocomplete
             onLoad={onAutocompleteLoad}
@@ -255,9 +295,28 @@ export function AddressMapPicker({
               placeholder="Busca tu dirección..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={(e) => {
+                // Prevenir que Enter envíe el formulario padre
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                }
+              }}
             />
           </Autocomplete>
-          <Button type="button" variant="outline" onClick={getCurrentLocation}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleManualSearch}
+            title="Buscar dirección"
+          >
+            🔍
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={getCurrentLocation}
+            title="Mi ubicación"
+          >
             <MapPin className="h-4 w-4" />
           </Button>
         </div>

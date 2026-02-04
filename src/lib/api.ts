@@ -972,8 +972,9 @@ export interface AddressDto {
   ciudad: string;
   codigo_postal: string;
   es_predeterminada: boolean;
+  es_temporal: boolean;
   fecha_creacion: string;
-  fecha_modificacion: string;
+  fecha_modificacion?: string;
 }
 
 export async function getAddressesApi() {
@@ -984,13 +985,14 @@ export async function getAddressesApi() {
 }
 
 export async function createAddressApi(payload: {
-  alias: string;
+  alias?: string;
   direccion_linea1: string;
   direccion_linea2?: string;
   distrito: string;
   ciudad: string;
-  codigo_postal: string;
+  codigo_postal?: string;
   es_predeterminada?: boolean;
+  es_temporal?: boolean;
 }) {
   return apiFetch<AddressDto>("/users/me/addresses", {
     method: "POST",
