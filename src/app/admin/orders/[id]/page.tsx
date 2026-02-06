@@ -285,17 +285,36 @@ export default function AdminOrderDetailPage() {
                       </div>
                     ))}
                     <Separator />
-                    <div className="flex justify-between pt-2">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-medium">
-                        {formatPrice(order.subtotal)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total</span>
-                      <span className="text-primary">
-                        {formatPrice(order.total)}
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between pt-2">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="font-medium">
+                          {formatPrice(order.subtotal)}
+                        </span>
+                      </div>
+                      {order.tipo_entrega === "delivery" &&
+                        parseFloat(order.total) >
+                          parseFloat(order.subtotal) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Delivery
+                            </span>
+                            <span className="font-medium">
+                              {formatPrice(
+                                String(
+                                  parseFloat(order.total) -
+                                    parseFloat(order.subtotal),
+                                ),
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total</span>
+                        <span className="text-primary">
+                          {formatPrice(order.total)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

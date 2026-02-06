@@ -87,7 +87,7 @@ export function ProductFiltersSheet({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 space-y-6 px-4">
           {/* Búsqueda por nombre */}
           <div className="space-y-2">
             <Label htmlFor="search">Buscar por nombre</Label>
@@ -98,7 +98,10 @@ export function ProductFiltersSheet({
                 placeholder="Ej: Torta de chocolate..."
                 value={localFilters.search}
                 onChange={(e) =>
-                  setLocalFilters((prev) => ({ ...prev, search: e.target.value }))
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
                 }
                 className="pl-9"
               />
@@ -113,7 +116,7 @@ export function ProductFiltersSheet({
             <div className="flex flex-wrap gap-2">
               {categories.map((category) => {
                 const isSelected = localFilters.categories.includes(
-                  category.categoria_id
+                  category.categoria_id,
                 );
                 return (
                   <Button
@@ -129,9 +132,9 @@ export function ProductFiltersSheet({
             </div>
           </div>
 
-          <Separator />
+          {/* Separator */}
 
-          {/* Stock disponible */}
+          {/* Stock disponible
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="stock">Solo con stock disponible</Label>
@@ -147,8 +150,9 @@ export function ProductFiltersSheet({
               }
             />
           </div>
+          */}
 
-          <Separator />
+          {/* Separator */}
 
           {/* Botones de acción */}
           <div className="flex gap-3 pt-4">
@@ -172,7 +176,10 @@ export function ProductFiltersSheet({
 interface ActiveFiltersProps {
   filters: ProductFilters;
   categories: CategoryDto[];
-  onRemoveFilter: (type: "search" | "category" | "inStock", value?: number) => void;
+  onRemoveFilter: (
+    type: "search" | "category" | "inStock",
+    value?: number,
+  ) => void;
 }
 
 export function ActiveFilters({

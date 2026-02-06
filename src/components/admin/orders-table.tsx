@@ -345,18 +345,11 @@ export function OrdersTable({}: OrdersTableProps) {
             {payment.label}
           </Badge>
         </TableCell>
-        <TableCell className="text-right space-x-2">
+        <TableCell className="text-right">
           <Button asChild variant="ghost" size="sm">
             <Link href={`/admin/orders/${order.pedido_id}`}>
               <Eye className="h-4 w-4" />
             </Link>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleSendNotification(order)}
-          >
-            WhatsApp
           </Button>
         </TableCell>
       </TableRow>
@@ -440,7 +433,7 @@ export function OrdersTable({}: OrdersTableProps) {
                   <TableHead>Total</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Pago</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="text-right">Ver</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

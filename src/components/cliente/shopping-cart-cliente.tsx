@@ -173,7 +173,7 @@ export function ShoppingCartCliente() {
                 </Alert>
               )}
 
-              <div className="space-y-2">
+              <div className="space-y-2 px-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">
