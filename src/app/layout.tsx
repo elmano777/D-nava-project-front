@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Playfair_Display } from "next/font/google";
 import { Toaster } from "sonner";
 import { StructuredData } from "@/components/structured-data";
+import Script from "next/script";
 import "./globals.css";
 
 const geist = Geist({
@@ -74,6 +75,18 @@ export default function RootLayout({
     <html lang="es" className={`${geist.variable} ${playfair.variable}`}>
       <head>
         <StructuredData />
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-4FZS5T5B2J"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-4FZS5T5B2J');
+          `}
+        </Script>
       </head>
       <body className={`font-sans antialiased`}>
         {children}
