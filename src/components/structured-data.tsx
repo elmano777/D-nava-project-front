@@ -7,8 +7,8 @@ export function StructuredData() {
     name: "D'Nava",
     description:
       "Panadería y pastelería artesanal. Productos de alta calidad elaborados con dedicación familiar.",
-    image: "https://www.dnava-api.com/placeholder-logo.png",
-    logo: "https://www.dnava-api.com/placeholder-logo.png",
+    image: "https://www.dnava-api.com/images/dnava-logo2.png",
+    logo: "https://www.dnava-api.com/images/dnava-logo2.png",
     url: "https://www.dnava-api.com",
     telephone: "+51940241024",
     email: "dnavapasteleria@gmail.com",
@@ -21,8 +21,8 @@ export function StructuredData() {
     },
     geo: {
       "@type": "GeoCoordinates",
-      latitude: -12.046373,
-      longitude: -76.854783,
+      latitude: -12.082785749205195,
+      longitude: -76.98209761534501,
     },
     openingHoursSpecification: [
       {
@@ -47,11 +47,7 @@ export function StructuredData() {
     priceRange: "$$",
     servesCuisine: ["Bakery", "Pastry", "Desserts"],
     acceptsReservations: true,
-    sameAs: [
-      // Agrega aquí tus redes sociales cuando las tengas
-      // "https://www.facebook.com/dnava",
-      // "https://www.instagram.com/dnava",
-    ],
+    sameAs: ["https://www.instagram.com/dnava.pasteleria/"],
   };
 
   const organizationSchema = {
@@ -59,7 +55,7 @@ export function StructuredData() {
     "@type": "Organization",
     name: "D'Nava",
     url: "https://www.dnava-api.com",
-    logo: "https://www.dnava-api.com/placeholder-logo.png",
+    logo: "https://www.dnava-api.com/images/dnava-logo2.png",
     description: "Panadería y pastelería artesanal",
     contactPoint: {
       "@type": "ContactPoint",
