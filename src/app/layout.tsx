@@ -15,9 +15,53 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "D'Nava - Panadería y Pastelería Artesanal",
+  metadataBase: new URL("https://www.dnava-api.com"),
+  title: {
+    default: "D'Nava - Panadería y Pastelería Artesanal",
+    template: "%s | D'Nava",
+  },
   description:
     "Productos artesanales de alta calidad. Tortas, panes y postres elaborados con dedicación familiar.",
+  keywords: [
+    "panadería",
+    "pastelería",
+    "tortas artesanales",
+    "panes artesanales",
+    "postres",
+    "Lima",
+    "Perú",
+    "delivery",
+    "tortas por encargo",
+    "pastelería peruana",
+  ],
+  authors: [{ name: "D'Nava" }],
+  creator: "D'Nava",
+  openGraph: {
+    type: "website",
+    locale: "es_PE",
+    url: "https://www.dnava-api.com",
+    title: "D'Nava - Panadería y Pastelería Artesanal",
+    description:
+      "Productos artesanales de alta calidad. Tortas, panes y postres elaborados con dedicación familiar.",
+    siteName: "D'Nava",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "D'Nava - Panadería y Pastelería Artesanal",
+    description:
+      "Productos artesanales de alta calidad. Tortas, panes y postres elaborados con dedicación familiar.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({
