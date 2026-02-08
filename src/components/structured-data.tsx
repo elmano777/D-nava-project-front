@@ -17,6 +17,7 @@ export function StructuredData() {
       streetAddress: "Retamas 479",
       addressLocality: "Ate Salamanca",
       addressRegion: "Lima",
+      postalCode: "15022",
       addressCountry: "PE",
     },
     geo: {
