@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Playfair_Display } from "next/font/google";
 import { Toaster } from "sonner";
 import { StructuredData } from "@/components/structured-data";
+import { HealthCheckProvider } from "@/components/HealthCheckProvider";
 import Script from "next/script";
 import "./globals.css";
 
@@ -89,8 +90,10 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`font-sans antialiased`}>
-        {children}
-        <Toaster position="top-center" richColors />
+        <HealthCheckProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </HealthCheckProvider>
       </body>
     </html>
   );

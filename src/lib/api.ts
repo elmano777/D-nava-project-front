@@ -18,6 +18,41 @@ export interface ApiError extends Error {
 let isRefreshing = false;
 let refreshPromise: Promise<void> | null = null;
 
+// Health check callback - se setea desde el componente App
+let maintenanceModeCallback: (() => void) | null = null;
+
+export function setMaintenanceModeCallback(callback: () => void) {
+  maintenanceModeCallback = callback;
+}
+
+/**
+ * Verifica la salud del backend
+ */
+export async function checkBackendHealth(): Promise<{
+  status: "ok" | "degraded" | "unknown";
+  consecutiveFailures: number;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await response.json();
+
+    return {
+      status: data.status || "unknown",
+      consecutiveFailures: data.database?.consecutiveFailures || 0,
+    };
+  } catch (error) {
+    console.error("❌ Health check falló:", error);
+    return {
+      status: "degraded",
+      consecutiveFailures: 999, // Fallo crítico
+    };
+  }
+}
+
 /**
  * Refresca el access token usando el refresh token
  */
@@ -116,10 +151,39 @@ async function apiFetch<T>(
     }
   }
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (fetchError) {
+    // Error de red (backend apagado, sin conexión, timeout, etc.)
+    console.error(
+      "❌ Error de red al intentar conectar con el backend:",
+      fetchError,
+    );
+
+    if (typeof window !== "undefined") {
+      // Verificar si es un problema del backend
+      const health = await checkBackendHealth().catch(() => ({
+        status: "degraded" as const,
+        consecutiveFailures: 999,
+      }));
+
+      if (health.status === "degraded" && maintenanceModeCallback) {
+        console.error("🔧 Backend no responde, activando modo mantenimiento");
+        maintenanceModeCallback();
+      }
+    }
+
+    const error: ApiError = new Error(
+      "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
+    );
+    error.status = 0;
+    error.details = fetchError;
+    throw error;
+  }
 
   let data: unknown = null;
   const text = await res.text();
@@ -174,6 +238,23 @@ async function apiFetch<T>(
         console.error("❌ No se pudo refrescar el token:", refreshError);
         // Si falla el refresh, el usuario será redirigido al login automáticamente
       }
+    }
+
+    // Si es error 500+ o timeout, verificar salud del backend
+    if (res.status >= 500 && typeof window !== "undefined") {
+      console.warn("⚠️ Error 500+ detectado, verificando salud del backend...");
+
+      // Verificar health check en background
+      checkBackendHealth()
+        .then((health) => {
+          if (health.status === "degraded" && maintenanceModeCallback) {
+            console.error("🔧 Backend degradado, activando modo mantenimiento");
+            maintenanceModeCallback();
+          }
+        })
+        .catch((err) => {
+          console.error("Error verificando health check:", err);
+        });
     }
 
     const error: ApiError = new Error(
