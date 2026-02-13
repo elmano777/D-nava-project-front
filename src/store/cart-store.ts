@@ -11,7 +11,7 @@ export interface CartItem {
 
 export type DeliveryType = "recojo_tienda" | "delivery";
 
-export const MINIMUM_ORDER_AMOUNT = 2; // 2 soles
+export const MINIMUM_ORDER_AMOUNT = 20; // 20 soles
 export const DELIVERY_COST = 5; // 5 soles (precio base, se calculará dinámicamente)
 
 interface CartState {

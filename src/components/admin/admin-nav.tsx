@@ -25,7 +25,45 @@ export function AdminNav() {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    setUser(getStoredUser());
+    const currentUser = getStoredUser();
+    setUser(currentUser);
+
+    // Verificar que sea un administrador
+    if (currentUser && currentUser.rol !== "administrador") {
+      // Si no es admin, redirigir
+      clearAuthData();
+      router.replace("/auth/login");
+      return;
+    }
+
+    // Escuchar cambios en localStorage desde otras pestañas
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "backend_user") {
+        if (e.newValue) {
+          try {
+            const newUser = JSON.parse(e.newValue);
+            // Si cambió de usuario o rol, redirigir
+            if (
+              newUser.rol !== "administrador" ||
+              newUser.usuario_id !== currentUser?.usuario_id
+            ) {
+              window.location.href = "/auth/login";
+            }
+          } catch (error) {
+            console.error("Error parsing user data:", error);
+          }
+        } else {
+          // Usuario cerró sesión
+          window.location.href = "/";
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
   const handleLogout = () => {

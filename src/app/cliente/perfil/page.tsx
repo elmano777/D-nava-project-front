@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { VerificationBanner } from "@/components/VerificationBanner";
 import { ClienteNav } from "@/components/cliente/cliente-nav";
+import { ClienteFooter } from "@/components/cliente/cliente-footer";
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -90,7 +91,8 @@ export default function PerfilPage() {
   const loadOrders = async () => {
     try {
       const data = await listOrdersApi();
-      setOrders(data);
+      const ordersList = Array.isArray(data) ? data : data.data;
+      setOrders(ordersList);
     } catch (error) {
       console.error("Error al cargar pedidos:", error);
     }
@@ -267,7 +269,7 @@ export default function PerfilPage() {
     (o) => o.estado_pedido === "completado",
   ).length;
   const totalSpent = orders
-    .filter((o) => o.estado_pedido !== "cancelado")
+    .filter((o) => o.estado_pedido === "completado")
     .reduce((sum, o) => sum + parseFloat(o.total), 0);
 
   return (
@@ -630,6 +632,7 @@ export default function PerfilPage() {
           </Tabs>
         </div>
       </div>
+      <ClienteFooter />
     </div>
   );
 }

@@ -168,12 +168,13 @@ export function ShoppingCartCliente() {
                     faltan{" "}
                     {formatPrice(
                       Math.round((MINIMUM_ORDER_AMOUNT - subtotal) * 100),
-                    )}
+                    )}{" "}
+                    para continuar.
                   </AlertDescription>
                 </Alert>
               )}
 
-              <div className="space-y-2 px-4">
+              <div className="space-y-3 px-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">
@@ -182,7 +183,9 @@ export function ShoppingCartCliente() {
                 </div>
                 {deliveryType === "delivery" && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Delivery</span>
+                    <span className="text-muted-foreground">
+                      Delivery (estimado)
+                    </span>
                     <span className="font-medium">
                       {formatPrice(Math.round(deliveryCost * 100))}
                     </span>
@@ -190,10 +193,27 @@ export function ShoppingCartCliente() {
                 )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
+                  <span>Total estimado</span>
                   <span className="text-primary">
                     {formatPrice(Math.round(total * 100))}
                   </span>
+                </div>
+
+                {/* Info adicional */}
+                <div className="space-y-1 text-xs text-muted-foreground pt-2">
+                  <div className="flex items-start gap-2">
+                    <span>💡</span>
+                    <span>
+                      Pedido mínimo: S/ {MINIMUM_ORDER_AMOUNT.toFixed(2)}
+                      {isMinimumMet && " ✅"}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span>📍</span>
+                    <span>
+                      Delivery final: S/ 5.00 - S/ 15.00 (según distancia)
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -204,7 +224,7 @@ export function ShoppingCartCliente() {
                 disabled={!isMinimumMet}
               >
                 <ShoppingBag className="h-5 w-5" />
-                Proceder al Pago
+                {isMinimumMet ? "Proceder al Pago" : "Agrega más productos"}
               </Button>
             </div>
           </>

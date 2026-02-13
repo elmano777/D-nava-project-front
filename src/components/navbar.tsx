@@ -1,11 +1,13 @@
 "use client";
 
-import { Menu, X, User } from "lucide-react";
-import { useState } from "react";
+import { Menu, X, User, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ShoppingCartDrawer } from "@/components/shopping-cart";
+import { getStoredUser } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +18,62 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function Navbar() {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<{
+    nombre_completo: string;
+    rol: string;
+  } | null>(null);
+
+  useEffect(() => {
+    // Verificar si hay un usuario logueado al montar
+    const storedUser = getStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
+    }
+
+    // Escuchar cambios en localStorage desde otras pestañas
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "backend_user") {
+        if (e.newValue) {
+          // Usuario logueado o cambió de cuenta
+          try {
+            const newUser = JSON.parse(e.newValue);
+            setUser(newUser);
+            // Recargar la página para refrescar todo el contenido
+            window.location.reload();
+          } catch (error) {
+            console.error("Error parsing user data:", error);
+          }
+        } else {
+          // Usuario cerró sesión
+          setUser(null);
+          window.location.href = "/";
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("backend_user");
+    document.cookie = "access_token=; path=/; max-age=0";
+    document.cookie = "backend_user=; path=/; max-age=0";
+    setUser(null);
+    router.push("/");
+  };
+
+  const getDashboardUrl = () => {
+    if (user?.rol === "administrador") return "/admin";
+    return "/cliente";
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -62,17 +119,40 @@ export function Navbar() {
 
           {/* Cart & Actions */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="hidden md:flex"
-            >
-              <Link href="/auth/login">
-                <User className="h-4 w-4 mr-2" />
-                Ingresar
-              </Link>
-            </Button>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="hidden md:flex">
+                    <User className="h-4 w-4 mr-2" />
+                    {user.nombre_completo.split(" ")[0]}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={getDashboardUrl()}>Ir al Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Cerrar Sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="hidden md:flex"
+              >
+                <Link href="/auth/login">
+                  <User className="h-4 w-4 mr-2" />
+                  Ingresar
+                </Link>
+              </Button>
+            )}
 
             <ShoppingCartDrawer />
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ClienteNav } from "@/components/cliente/cliente-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,6 +118,60 @@ export default function CheckoutPage() {
     }
   }, []);
 
+  // Función para seleccionar dirección y calcular delivery
+  const handleSelectAddress = useCallback(
+    async (addressId: number) => {
+      const address = addresses.find((addr) => addr.direccion_id === addressId);
+      if (address) {
+        setSelectedAddressId(addressId);
+        setFormData((prev) => ({
+          ...prev,
+          address: address.direccion_linea1,
+          city: address.distrito,
+        }));
+
+        // Calcular distancia usando la dirección completa
+        // Formato mejorado para geocodificación
+        const fullAddress = `${address.direccion_linea1}, ${address.distrito}, Lima, Perú`;
+
+        setIsCalculatingDistance(true);
+        setDistanceError(null);
+
+        try {
+          const { calculateDeliveryDistance } =
+            await import("@/lib/distance-calculator");
+          const result = await calculateDeliveryDistance(fullAddress);
+
+          if (!result.isWithinCoverage) {
+            setDistanceError(
+              `Lo sentimos, no realizamos entregas a más de 8 km. Esta dirección está a ${result.distanceInKm.toFixed(1)} km.`,
+            );
+            setDeliveryCost(0);
+          } else {
+            setDeliveryCost(result.deliveryCost);
+          }
+        } catch (error: any) {
+          // Si no se puede geocodificar (Geocoding API no habilitada),
+          // usar costo por defecto del primer tier
+          console.warn(
+            `No se pudo calcular distancia para dirección guardada. Usando tarifa base de S/ 5.00`,
+          );
+          console.log("Dirección:", fullAddress);
+          console.log("Error:", error.message);
+
+          setDeliveryCost(5); // Costo del primer tier (0-1km)
+
+          // NO mostrar error al usuario, el delivery funcionará con tarifa base
+          // Para cálculo exacto, el usuario debe usar "Ubicación Actual" con el mapa
+          setDistanceError(null);
+        } finally {
+          setIsCalculatingDistance(false);
+        }
+      }
+    },
+    [addresses, setDeliveryCost],
+  );
+
   // Cargar direcciones guardadas
   useEffect(() => {
     const loadAddresses = async () => {
@@ -125,15 +179,11 @@ export default function CheckoutPage() {
         const data = await getAddressesApi();
         setAddresses(data);
 
-        // Auto-seleccionar la dirección predeterminada
+        // Auto-seleccionar la dirección predeterminada y calcular delivery
         const defaultAddress = data.find((addr) => addr.es_predeterminada);
         if (defaultAddress) {
-          setSelectedAddressId(defaultAddress.direccion_id);
-          setFormData((prev) => ({
-            ...prev,
-            address: defaultAddress.direccion_linea1,
-            city: defaultAddress.distrito,
-          }));
+          // Usar handleSelectAddress para que calcule la distancia automáticamente
+          handleSelectAddress(defaultAddress.direccion_id);
         }
       } catch (error) {
         console.error("Error cargando direcciones:", error);
@@ -141,7 +191,7 @@ export default function CheckoutPage() {
     };
 
     loadAddresses();
-  }, []);
+  }, [handleSelectAddress]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -211,6 +261,7 @@ export default function CheckoutPage() {
         fecha_hora_programada: fechaProgramada,
         notas_cliente: undefined,
         metodo_pago: "tarjeta", // se actualiza después del pago real en /payment
+        costo_delivery: deliveryType === "delivery" ? deliveryCost : 0, // Enviar costo de delivery calculado
         items: orderItems,
       });
 
@@ -257,56 +308,6 @@ export default function CheckoutPage() {
       );
 
     setFormData((prev) => ({ ...prev, phone: formatted }));
-  };
-
-  const handleSelectAddress = async (addressId: number) => {
-    const address = addresses.find((addr) => addr.direccion_id === addressId);
-    if (address) {
-      setSelectedAddressId(addressId);
-      setFormData((prev) => ({
-        ...prev,
-        address: address.direccion_linea1,
-        city: address.distrito,
-      }));
-
-      // Calcular distancia usando la dirección completa
-      // Formato mejorado para geocodificación
-      const fullAddress = `${address.direccion_linea1}, ${address.distrito}, Lima, Perú`;
-
-      setIsCalculatingDistance(true);
-      setDistanceError(null);
-
-      try {
-        const { calculateDeliveryDistance } =
-          await import("@/lib/distance-calculator");
-        const result = await calculateDeliveryDistance(fullAddress);
-
-        if (!result.isWithinCoverage) {
-          setDistanceError(
-            `Lo sentimos, no realizamos entregas a más de 8 km. Esta dirección está a ${result.distanceInKm.toFixed(1)} km.`,
-          );
-          setDeliveryCost(0);
-        } else {
-          setDeliveryCost(result.deliveryCost);
-        }
-      } catch (error: any) {
-        // Si no se puede geocodificar (Geocoding API no habilitada),
-        // usar costo por defecto del primer tier
-        console.warn(
-          `No se pudo calcular distancia para dirección guardada. Usando tarifa base de S/ 5.00`,
-        );
-        console.log("Dirección:", fullAddress);
-        console.log("Error:", error.message);
-
-        setDeliveryCost(5); // Costo del primer tier (0-1km)
-
-        // NO mostrar error al usuario, el delivery funcionará con tarifa base
-        // Para cálculo exacto, el usuario debe usar "Ubicación Actual" con el mapa
-        setDistanceError(null);
-      } finally {
-        setIsCalculatingDistance(false);
-      }
-    }
   };
 
   const calculateAndSetDeliveryCost = async (lat: number, lng: number) => {

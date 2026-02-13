@@ -71,7 +71,10 @@ export default function AdminReportsPage() {
         ]);
 
         if (statsData) setStats(statsData);
-        setOrders(ordersData);
+        const ordersList = Array.isArray(ordersData)
+          ? ordersData
+          : ordersData.data;
+        setOrders(ordersList);
         setTopProducts(topProductsData);
       } catch (error) {
         console.error("Error cargando datos:", error);

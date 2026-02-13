@@ -16,10 +16,13 @@ import { Separator } from "@/components/ui/separator";
 import { SlidersHorizontal, X, Search } from "lucide-react";
 import { CategoryDto } from "@/lib/api";
 
+export type SortOption = "default" | "price_asc" | "price_desc";
+
 export interface ProductFilters {
   search: string;
   categories: number[];
   inStock: boolean;
+  sortBy: SortOption;
 }
 
 interface ProductFiltersProps {
@@ -46,6 +49,7 @@ export function ProductFiltersSheet({
       search: "",
       categories: [],
       inStock: false,
+      sortBy: "default",
     };
     setLocalFilters(cleared);
     onFiltersChange(cleared);
@@ -62,9 +66,9 @@ export function ProductFiltersSheet({
   };
 
   const activeFiltersCount =
-    (filters.search ? 1 : 0) +
     filters.categories.length +
-    (filters.inStock ? 1 : 0);
+    (filters.inStock ? 1 : 0) +
+    (filters.sortBy !== "default" ? 1 : 0);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -88,23 +92,34 @@ export function ProductFiltersSheet({
         </SheetHeader>
 
         <div className="mt-6 space-y-6 px-4">
-          {/* Búsqueda por nombre */}
-          <div className="space-y-2">
-            <Label htmlFor="search">Buscar por nombre</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="search"
-                placeholder="Ej: Torta de chocolate..."
-                value={localFilters.search}
-                onChange={(e) =>
-                  setLocalFilters((prev) => ({
-                    ...prev,
-                    search: e.target.value,
-                  }))
+          {/* Ordenar por precio */}
+          <div className="space-y-3">
+            <Label>Ordenar por precio</Label>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant={
+                  localFilters.sortBy === "price_asc" ? "default" : "outline"
                 }
-                className="pl-9"
-              />
+                size="sm"
+                onClick={() =>
+                  setLocalFilters((prev) => ({ ...prev, sortBy: "price_asc" }))
+                }
+                className="justify-start"
+              >
+                Precio: Más barato primero
+              </Button>
+              <Button
+                variant={
+                  localFilters.sortBy === "price_desc" ? "default" : "outline"
+                }
+                size="sm"
+                onClick={() =>
+                  setLocalFilters((prev) => ({ ...prev, sortBy: "price_desc" }))
+                }
+                className="justify-start"
+              >
+                Precio: Más caro primero
+              </Button>
             </div>
           </div>
 
@@ -177,7 +192,7 @@ interface ActiveFiltersProps {
   filters: ProductFilters;
   categories: CategoryDto[];
   onRemoveFilter: (
-    type: "search" | "category" | "inStock",
+    type: "search" | "category" | "inStock" | "sortBy",
     value?: number,
   ) => void;
 }
@@ -188,17 +203,25 @@ export function ActiveFilters({
   onRemoveFilter,
 }: ActiveFiltersProps) {
   const hasActiveFilters =
-    filters.search || filters.categories.length > 0 || filters.inStock;
+    filters.categories.length > 0 ||
+    filters.inStock ||
+    filters.sortBy !== "default";
 
   if (!hasActiveFilters) return null;
 
+  const sortLabels: Record<SortOption, string> = {
+    default: "",
+    price_asc: "Precio: Más barato",
+    price_desc: "Precio: Más caro",
+  };
+
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      {filters.search && (
+      {filters.sortBy !== "default" && (
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-          Búsqueda: {filters.search}
+          {sortLabels[filters.sortBy]}
           <button
-            onClick={() => onRemoveFilter("search")}
+            onClick={() => onRemoveFilter("sortBy")}
             className="ml-1 rounded-full p-0.5 hover:bg-primary/20"
           >
             <X className="h-3 w-3" />

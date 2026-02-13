@@ -9,7 +9,7 @@ const ORIGIN_ADDRESS = "Av. Retamas 479, Ate Salamanca, Lima, Peru";
 export const DELIVERY_RATES = {
   tier1: { maxKm: 1, price: 5.0 }, // 0-1 km: S/ 5.00
   tier2: { maxKm: 3, price: 8.0 }, // 1-3 km: S/ 8.00
-  tier3: { maxKm: 8, price: 13.0 }, // 3-8 km: S/ 13.00
+  tier3: { maxKm: 8, price: 15.0 }, // 3-8 km: S/ 15.00
   maxCoverage: 8, // Máximo 8 km de cobertura
 };
 

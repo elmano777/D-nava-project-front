@@ -455,19 +455,23 @@ export default function AdminOrderDetailPage() {
                     </p>
                   </div>
                   {order.direccion_entrega && (
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <span className="text-sm">{order.direccion_entrega}</span>
-                    </div>
-                  )}
-                  {order.fecha_hora_programada && (
                     <div>
-                      <p className="text-sm text-muted-foreground">
-                        Fecha programada
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Dirección de entrega
                       </p>
-                      <p className="font-medium">
-                        {formatDate(order.fecha_hora_programada)}
-                      </p>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium">
+                            {order.direccion_entrega}
+                          </p>
+                          {order.distrito_entrega && (
+                            <p className="text-muted-foreground">
+                              {order.distrito_entrega}, Lima
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                   {order.notas_cliente && (

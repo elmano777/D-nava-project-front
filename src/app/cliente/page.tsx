@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { ClienteNav } from "@/components/cliente/cliente-nav";
+import { ClienteFooter } from "@/components/cliente/cliente-footer";
 import { ProductCardCliente } from "@/components/cliente/product-card-cliente";
 import {
   ProductFiltersSheet,
@@ -9,6 +10,10 @@ import {
   ProductFilters,
 } from "@/components/cliente/product-filters";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PRODUCTS_PER_PAGE = 12;
 import {
   getProductsPublicApi,
   listCategoriesApi,
@@ -21,11 +26,12 @@ export default function ClienteDashboardPage() {
   const [products, setProducts] = useState<ProductWithImagesDto[]>([]);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<ProductFilters>({
     search: "",
     categories: [],
     inStock: false,
+    sortBy: "default",
   });
 
   useEffect(() => {
@@ -49,11 +55,11 @@ export default function ClienteDashboardPage() {
 
   // Reset showAll when filters change
   useEffect(() => {
-    setShowAll(false);
+    setCurrentPage(1);
   }, [filters]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    let filtered = products.filter((product) => {
       // Filtro por búsqueda
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -81,15 +87,28 @@ export default function ClienteDashboardPage() {
 
       return true;
     });
+
+    // Ordenamiento
+    if (filters.sortBy === "price_asc") {
+      filtered = [...filtered].sort(
+        (a, b) => parseFloat(a.precio_base) - parseFloat(b.precio_base),
+      );
+    } else if (filters.sortBy === "price_desc") {
+      filtered = [...filtered].sort(
+        (a, b) => parseFloat(b.precio_base) - parseFloat(a.precio_base),
+      );
+    }
+
+    return filtered;
   }, [products, filters]);
 
-  const displayedProducts = showAll
-    ? filteredProducts
-    : filteredProducts.slice(0, 8);
-  const hasMoreProducts = filteredProducts.length > 8;
+  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const endIndex = startIndex + PRODUCTS_PER_PAGE;
+  const displayedProducts = filteredProducts.slice(startIndex, endIndex);
 
   const handleRemoveFilter = (
-    type: "search" | "category" | "inStock",
+    type: "search" | "category" | "inStock" | "sortBy",
     value?: number,
   ) => {
     setFilters((prev) => {
@@ -104,6 +123,9 @@ export default function ClienteDashboardPage() {
       }
       if (type === "inStock") {
         return { ...prev, inStock: false };
+      }
+      if (type === "sortBy") {
+        return { ...prev, sortBy: "default" };
       }
       return prev;
     });
@@ -126,20 +148,37 @@ export default function ClienteDashboardPage() {
           </div>
         ) : (
           <>
-            {/* Filtros y badges activos */}
+            {/* Barra de búsqueda y filtros */}
             <div className="flex flex-col gap-4 mb-8">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Búsqueda */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar productos..."
+                    value={filters.search}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        search: e.target.value,
+                      }))
+                    }
+                    className="pl-9"
+                  />
+                </div>
+                {/* Filtros */}
                 <ProductFiltersSheet
                   categories={categories}
                   filters={filters}
                   onFiltersChange={setFilters}
                 />
-                <ActiveFilters
-                  filters={filters}
-                  categories={categories}
-                  onRemoveFilter={handleRemoveFilter}
-                />
               </div>
+              {/* Filtros activos */}
+              <ActiveFilters
+                filters={filters}
+                categories={categories}
+                onRemoveFilter={handleRemoveFilter}
+              />
             </div>
 
             {/* Productos */}
@@ -170,14 +209,74 @@ export default function ClienteDashboardPage() {
                   ))}
                 </div>
 
-                {hasMoreProducts && !showAll && (
-                  <div className="flex justify-center mt-8">
+                {/* Paginación */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-8">
                     <Button
-                      onClick={() => setShowAll(true)}
-                      size="lg"
                       variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={currentPage === 1}
                     >
-                      Ver todos los productos ({filteredProducts.length})
+                      <ChevronLeft className="h-4 w-4" />
+                      Anterior
+                    </Button>
+
+                    <div className="flex gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                        (page) => {
+                          const showPage =
+                            page === 1 ||
+                            page === totalPages ||
+                            Math.abs(page - currentPage) <= 1;
+
+                          if (!showPage && page === currentPage - 2) {
+                            return (
+                              <span key={page} className="px-2 py-1">
+                                ...
+                              </span>
+                            );
+                          }
+
+                          if (!showPage && page === currentPage + 2) {
+                            return (
+                              <span key={page} className="px-2 py-1">
+                                ...
+                              </span>
+                            );
+                          }
+
+                          if (!showPage) return null;
+
+                          return (
+                            <Button
+                              key={page}
+                              variant={
+                                currentPage === page ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="w-10"
+                            >
+                              {page}
+                            </Button>
+                          );
+                        },
+                      )}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                    >
+                      Siguiente
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
@@ -190,7 +289,12 @@ export default function ClienteDashboardPage() {
                 <Button
                   variant="link"
                   onClick={() =>
-                    setFilters({ search: "", categories: [], inStock: false })
+                    setFilters({
+                      search: "",
+                      categories: [],
+                      inStock: false,
+                      sortBy: "default",
+                    })
                   }
                   className="mt-2"
                 >
@@ -201,6 +305,7 @@ export default function ClienteDashboardPage() {
           </>
         )}
       </main>
+      <ClienteFooter />
     </div>
   );
 }

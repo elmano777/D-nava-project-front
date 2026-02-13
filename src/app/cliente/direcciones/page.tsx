@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClienteNav } from "@/components/cliente/cliente-nav";
+import { ClienteFooter } from "@/components/cliente/cliente-footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -502,6 +503,7 @@ export default function DireccionesPage() {
           </AlertDialogContent>
         </AlertDialog>
       </main>
+      <ClienteFooter />
     </div>
   );
 }

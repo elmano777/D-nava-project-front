@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ClienteNav } from "@/components/cliente/cliente-nav";
+import { ClienteFooter } from "@/components/cliente/cliente-footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +16,7 @@ import {
   Loader2,
   ArrowLeft,
   MessageCircle,
+  CreditCard,
 } from "lucide-react";
 import {
   getOrderWithDetailsApi,
@@ -80,6 +82,7 @@ const paymentStatusConfig: Record<string, { label: string; color: string }> = {
 
 export default function PedidoDetallePage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
@@ -196,6 +199,20 @@ export default function PedidoDetallePage() {
     });
   };
 
+  const handleRetryPayment = () => {
+    // Guardar info del pedido en localStorage para retomar
+    localStorage.setItem(
+      "pendingOrder",
+      JSON.stringify({
+        pedidoId: order!.pedido_id,
+        numeroOrden: order!.numero_orden,
+        total: order!.total,
+      }),
+    );
+    // Redirigir a la página de pago
+    router.push("/cliente/checkout/payment");
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -257,7 +274,7 @@ export default function PedidoDetallePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 items-center">
                 <Badge
                   className={`${statusInfo.color} px-4 py-2 text-sm font-semibold`}
                   variant="secondary"
@@ -270,6 +287,17 @@ export default function PedidoDetallePage() {
                 >
                   Pago: {paymentInfo.label}
                 </Badge>
+                {order.estado_pago === "pendiente" &&
+                  order.estado_pedido !== "cancelado" && (
+                    <Button
+                      onClick={handleRetryPayment}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Retomar Pago
+                    </Button>
+                  )}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4 pt-4">
@@ -499,6 +527,7 @@ export default function PedidoDetallePage() {
           )}
         </div>
       </main>
+      <ClienteFooter />
     </div>
   );
 }

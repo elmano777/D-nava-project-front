@@ -529,6 +529,7 @@ export interface CreateOrderPayload {
   fecha_hora_programada: string;
   notas_cliente?: string;
   metodo_pago: "tarjeta" | "contra_entrega";
+  costo_delivery?: number; // Costo dinámico de delivery en soles
   items: CreateOrderItemPayload[];
 }
 
@@ -538,6 +539,13 @@ export async function createOrderApi(payload: CreateOrderPayload) {
     auth: true,
     body: JSON.stringify(payload),
   });
+}
+
+export interface ListOrdersResponse {
+  data: OrderDto[];
+  total: number;
+  limit: number | null;
+  offset: number;
 }
 
 export async function listOrdersApi(params?: {
@@ -553,7 +561,7 @@ export async function listOrdersApi(params?: {
   if (params?.offset !== undefined)
     searchParams.set("offset", String(params.offset));
   const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
-  return apiFetch<OrderDto[]>(`/orders${query}`, {
+  return apiFetch<ListOrdersResponse>(`/orders${query}`, {
     method: "GET",
     auth: true,
   });

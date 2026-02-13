@@ -45,7 +45,8 @@ export default function AdminPage() {
         setTotalProducts(products.length);
 
         // Contar pedidos pendientes (recibido o en_preparacion)
-        const pending = orders.filter(
+        const ordersList = Array.isArray(orders) ? orders : orders.data;
+        const pending = ordersList.filter(
           (o) =>
             o.estado_pedido === "recibido" ||
             o.estado_pedido === "en_preparacion",

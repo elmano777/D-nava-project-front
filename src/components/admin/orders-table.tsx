@@ -46,7 +46,8 @@ export function OrdersTable({}: OrdersTableProps) {
     const load = async () => {
       try {
         const data = await listOrdersApi();
-        if (isMounted) setOrders(data);
+        const ordersList = Array.isArray(data) ? data : data.data;
+        if (isMounted) setOrders(ordersList);
       } catch (error) {
         console.error("Error cargando pedidos desde backend:", error);
       } finally {
@@ -258,6 +259,18 @@ export function OrdersTable({}: OrdersTableProps) {
 
   const filteredOrders = getFilteredOrders();
 
+  // Separar pedidos pagados de pendientes
+  const paidOrders = filteredOrders.filter(
+    (order) =>
+      order.estado_pago === "pagado" || order.estado_pago === "completado",
+  );
+  const pendingOrders = filteredOrders.filter(
+    (order) =>
+      order.estado_pago === "pendiente" ||
+      order.estado_pago === "procesando" ||
+      order.estado_pago === "rechazado",
+  );
+
   const getFilterLabel = (): string => {
     switch (filterType) {
       case "today":
@@ -402,7 +415,7 @@ export function OrdersTable({}: OrdersTableProps) {
         )}
       </div>
 
-      {/* Tabla de pedidos */}
+      {/* Tablas de pedidos */}
       {isLoading ? (
         <div className="rounded-md border">
           <div className="text-center py-8 text-muted-foreground">
@@ -418,29 +431,63 @@ export function OrdersTable({}: OrdersTableProps) {
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-foreground px-1">
-            {getFilterLabel()} ({filteredOrders.length}{" "}
-            {filteredOrders.length === 1 ? "pedido" : "pedidos"})
-          </h2>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Pago</TableHead>
-                  <TableHead className="text-right">Ver</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => renderOrderRow(order))}
-              </TableBody>
-            </Table>
-          </div>
+        <div className="space-y-8">
+          {/* Tabla 1: Pedidos Pagados (PRIORITARIOS) */}
+          {paidOrders.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-foreground px-1">
+                ✅ Pedidos Pagados - {getFilterLabel()} ({paidOrders.length}{" "}
+                {paidOrders.length === 1 ? "pedido" : "pedidos"})
+              </h2>
+              <div className="rounded-md border border-green-200 bg-green-50/50">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Pago</TableHead>
+                      <TableHead className="text-right">Ver</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paidOrders.map((order) => renderOrderRow(order))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {/* Tabla 2: Pedidos Pendientes de Pago */}
+          {pendingOrders.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-muted-foreground px-1">
+                ⏳ Pedidos Pendientes de Pago - {getFilterLabel()} (
+                {pendingOrders.length}{" "}
+                {pendingOrders.length === 1 ? "pedido" : "pedidos"})
+              </h2>
+              <div className="rounded-md border border-yellow-200 bg-yellow-50/30">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Pago</TableHead>
+                      <TableHead className="text-right">Ver</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingOrders.map((order) => renderOrderRow(order))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
