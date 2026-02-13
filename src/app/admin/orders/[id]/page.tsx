@@ -34,6 +34,8 @@ import {
   OrderDto,
   OrderDetailDto,
   OrderEstadoPedido,
+  getPaymentStatusApi,
+  createCulqiRefundApi,
 } from "@/lib/api";
 import Link from "next/link";
 
@@ -145,14 +147,69 @@ export default function AdminOrderDetailPage() {
   const handleStatusChange = async (newStatus: string) => {
     if (!order) return;
 
+    // Si se está cancelando el pedido, confirmar con el admin
+    if (newStatus === "cancelado") {
+      const confirmed = window.confirm(
+        "¿Estás seguro de cancelar este pedido?\n\n" +
+          "Si el cliente ya pagó con tarjeta/Yape, se procesará automáticamente el reembolso.",
+      );
+      if (!confirmed) return;
+    }
+
     setIsUpdating(true);
     try {
+      // Si se está cancelando y hay pago, procesar refund primero
+      if (newStatus === "cancelado") {
+        let shouldRefund = false;
+
+        if (
+          order.estado_pago === "pagado" ||
+          order.estado_pago === "completado"
+        ) {
+          try {
+            const paymentStatus = await getPaymentStatusApi(order.pedido_id);
+            shouldRefund =
+              !!paymentStatus.culqi_charge_id &&
+              (paymentStatus.metodo_pago === "tarjeta" ||
+                paymentStatus.metodo_pago === "yape");
+          } catch (err) {
+            console.warn("No se pudo verificar el estado del pago:", err);
+          }
+        }
+
+        // Procesar refund si es necesario
+        if (shouldRefund) {
+          try {
+            await createCulqiRefundApi({
+              pedido_id: order.pedido_id,
+              reason: "solicitud_vendedor",
+            });
+            console.log("Devolución procesada exitosamente");
+          } catch (refundErr: any) {
+            console.error("Error al procesar devolución:", refundErr);
+            alert(
+              "Advertencia: No se pudo procesar el reembolso automáticamente. " +
+                "Deberás procesarlo manualmente desde el panel de Culqi.",
+            );
+            // Continuar con la cancelación aunque falle el refund
+          }
+        }
+      }
+
+      // Actualizar estado del pedido
       const updated = await updateOrderStatusApi(order.pedido_id, {
         estado_pedido: newStatus as OrderEstadoPedido,
       });
       setOrder({ ...order, ...updated });
+
+      if (newStatus === "cancelado") {
+        alert(
+          "Pedido cancelado exitosamente. El reembolso (si aplica) será procesado en 1-30 días.",
+        );
+      }
     } catch (err) {
       console.error("Error actualizando estado:", err);
+      alert("Error al actualizar el estado del pedido. Intenta nuevamente.");
     } finally {
       setIsUpdating(false);
     }
