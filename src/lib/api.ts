@@ -500,7 +500,10 @@ export interface OrderDto {
   email_cliente: string;
   tipo_entrega: string;
   direccion_entrega: string | null;
+  referencia_entrega: string | null;
   distrito_entrega: string | null;
+  ciudad_entrega: string | null;
+  codigo_postal_entrega: string | null;
   fecha_hora_programada: string;
   notas_cliente: string | null;
   subtotal: string;
