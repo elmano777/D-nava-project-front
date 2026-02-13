@@ -182,7 +182,7 @@ export default function AdminOrderDetailPage() {
           try {
             await createCulqiRefundApi({
               pedido_id: order.pedido_id,
-              reason: "solicitud_vendedor",
+              reason: "solicitud_comprador",
             });
             console.log("Devolución procesada exitosamente");
           } catch (refundErr: any) {
