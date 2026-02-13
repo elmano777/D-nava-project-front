@@ -31,11 +31,10 @@ import {
 import {
   getOrderWithDetailsApi,
   updateOrderStatusApi,
+  cancelOrderApi,
   OrderDto,
   OrderDetailDto,
   OrderEstadoPedido,
-  getPaymentStatusApi,
-  createCulqiRefundApi,
 } from "@/lib/api";
 import Link from "next/link";
 
@@ -158,54 +157,22 @@ export default function AdminOrderDetailPage() {
 
     setIsUpdating(true);
     try {
-      // Si se está cancelando y hay pago, procesar refund primero
+      // Si se está cancelando, usar el endpoint de cancelación que procesa refund automáticamente
       if (newStatus === "cancelado") {
-        let shouldRefund = false;
-
-        if (
-          order.estado_pago === "pagado" ||
-          order.estado_pago === "completado"
-        ) {
-          try {
-            const paymentStatus = await getPaymentStatusApi(order.pedido_id);
-            shouldRefund =
-              !!paymentStatus.culqi_charge_id &&
-              (paymentStatus.metodo_pago === "tarjeta" ||
-                paymentStatus.metodo_pago === "yape");
-          } catch (err) {
-            console.warn("No se pudo verificar el estado del pago:", err);
-          }
-        }
-
-        // Procesar refund si es necesario
-        if (shouldRefund) {
-          try {
-            await createCulqiRefundApi({
-              pedido_id: order.pedido_id,
-              reason: "solicitud_comprador",
-            });
-            console.log("Devolución procesada exitosamente");
-          } catch (refundErr: any) {
-            console.error("Error al procesar devolución:", refundErr);
-            alert(
-              "Advertencia: No se pudo procesar el reembolso automáticamente. " +
-                "Deberás procesarlo manualmente desde el panel de Culqi.",
-            );
-            // Continuar con la cancelación aunque falle el refund
-          }
-        }
-      }
-
-      // Actualizar estado del pedido
-      const updated = await updateOrderStatusApi(order.pedido_id, {
-        estado_pedido: newStatus as OrderEstadoPedido,
-      });
-      setOrder({ ...order, ...updated });
-
-      if (newStatus === "cancelado") {
-        alert(
-          "Pedido cancelado exitosamente. El reembolso (si aplica) será procesado en 1-30 días.",
+        const updated = await cancelOrderApi(
+          order.pedido_id,
+          "Cancelado por el administrador",
         );
+        setOrder({ ...order, ...updated });
+        alert(
+          "Pedido cancelado exitosamente. El reembolso (si aplica) será procesado automáticamente en 1-30 días.",
+        );
+      } else {
+        // Para otros cambios de estado, usar el endpoint normal
+        const updated = await updateOrderStatusApi(order.pedido_id, {
+          estado_pedido: newStatus as OrderEstadoPedido,
+        });
+        setOrder({ ...order, ...updated });
       }
     } catch (err) {
       console.error("Error actualizando estado:", err);

@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import {
   listOrdersApi,
   updateOrderStatusApi,
+  cancelOrderApi,
   sendNotificationApi,
   type OrderDto,
   type OrderEstadoPedido,
@@ -132,16 +133,53 @@ export function OrdersTable({}: OrdersTableProps) {
   const handleStatusChange = async (pedidoId: number, newStatus: string) => {
     const backendStatus = mapUiToBackendStatus(newStatus);
 
-    await updateOrderStatusApi(pedidoId, { estado_pedido: backendStatus });
+    // Si se está cancelando el pedido, confirmar y usar endpoint de cancelación
+    if (backendStatus === "cancelado") {
+      const confirmed = window.confirm(
+        "¿Estás seguro de cancelar este pedido?\n\n" +
+          "Si el cliente ya pagó con tarjeta/Yape, se procesará automáticamente el reembolso.",
+      );
+      if (!confirmed) return;
 
-    // Refrescar lista localmente sin recargar página completa
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.pedido_id === pedidoId
-          ? { ...order, estado_pedido: backendStatus }
-          : order,
-      ),
-    );
+      try {
+        // Usar el endpoint de cancelación que procesa el refund automáticamente
+        await cancelOrderApi(pedidoId, "Cancelado por el administrador");
+
+        // Refrescar lista localmente
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.pedido_id === pedidoId
+              ? { ...order, estado_pedido: backendStatus }
+              : order,
+          ),
+        );
+
+        alert(
+          "Pedido cancelado exitosamente. El reembolso (si aplica) será procesado automáticamente en 1-30 días.",
+        );
+      } catch (error) {
+        console.error("Error al cancelar pedido:", error);
+        alert("Error al cancelar el pedido. Intenta nuevamente.");
+      }
+      return;
+    }
+
+    // Para otros cambios de estado, usar el endpoint normal
+    try {
+      await updateOrderStatusApi(pedidoId, { estado_pedido: backendStatus });
+
+      // Refrescar lista localmente sin recargar página completa
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.pedido_id === pedidoId
+            ? { ...order, estado_pedido: backendStatus }
+            : order,
+        ),
+      );
+    } catch (error) {
+      console.error("Error al actualizar estado:", error);
+      alert("Error al actualizar el estado. Intenta nuevamente.");
+    }
   };
 
   const statusColors: Record<string, string> = {
