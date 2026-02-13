@@ -461,13 +461,22 @@ export default function AdminOrderDetailPage() {
                       </p>
                       <div className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <div className="text-sm">
+                        <div className="text-sm space-y-1">
                           <p className="font-medium">
                             {order.direccion_entrega}
                           </p>
-                          {order.distrito_entrega && (
+                          {order.referencia_entrega && (
                             <p className="text-muted-foreground">
-                              {order.distrito_entrega}, Lima
+                              {order.referencia_entrega}
+                            </p>
+                          )}
+                          <p className="text-muted-foreground">
+                            {order.distrito_entrega},{" "}
+                            {order.ciudad_entrega || "Lima"}
+                          </p>
+                          {order.codigo_postal_entrega && (
+                            <p className="text-muted-foreground">
+                              CP: {order.codigo_postal_entrega}
                             </p>
                           )}
                         </div>

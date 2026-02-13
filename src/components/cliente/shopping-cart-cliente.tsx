@@ -25,10 +25,12 @@ import {
   MINIMUM_ORDER_AMOUNT,
   DELIVERY_COST,
 } from "@/store/cart-store";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getAddressesApi } from "@/lib/api";
 
 export function ShoppingCartCliente() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoadingDelivery, setIsLoadingDelivery] = useState(false);
   const router = useRouter();
 
   const {
@@ -40,7 +42,63 @@ export function ShoppingCartCliente() {
     getDeliveryCost,
     getTotal,
     deliveryType,
+    setDeliveryCost,
   } = useCartStore();
+
+  // Cargar dirección predeterminada y calcular delivery
+  useEffect(() => {
+    const loadDefaultAddressAndCalculateDelivery = async () => {
+      if (deliveryType !== "delivery") return;
+
+      try {
+        setIsLoadingDelivery(true);
+        const addresses = await getAddressesApi();
+        const defaultAddress = addresses.find((addr) => addr.es_predeterminada);
+
+        if (defaultAddress) {
+          // Calcular delivery basado en la dirección predeterminada
+          const fullAddress = `${defaultAddress.direccion_linea1}, ${defaultAddress.distrito}, Lima, Perú`;
+
+          try {
+            const { calculateDeliveryDistance } =
+              await import("@/lib/distance-calculator");
+            const result = await calculateDeliveryDistance(fullAddress);
+
+            if (result.isWithinCoverage) {
+              setDeliveryCost(result.deliveryCost);
+            } else {
+              setDeliveryCost(0);
+            }
+          } catch (error) {
+            // Si falla la geocodificación, usar costo base
+            console.warn("No se pudo calcular distancia, usando tarifa base");
+            setDeliveryCost(5);
+          }
+        } else {
+          // No hay dirección predeterminada, usar costo estimado promedio
+          setDeliveryCost(DELIVERY_COST);
+        }
+      } catch (error) {
+        console.error("Error cargando direcciones:", error);
+        setDeliveryCost(DELIVERY_COST);
+      } finally {
+        setIsLoadingDelivery(false);
+      }
+    };
+
+    loadDefaultAddressAndCalculateDelivery();
+
+    // Escuchar cambios en la dirección predeterminada
+    const handleAddressChange = () => {
+      loadDefaultAddressAndCalculateDelivery();
+    };
+
+    window.addEventListener("defaultAddressChanged", handleAddressChange);
+
+    return () => {
+      window.removeEventListener("defaultAddressChanged", handleAddressChange);
+    };
+  }, [deliveryType, setDeliveryCost]);
 
   const formatPrice = (priceInCents: number) => {
     return new Intl.NumberFormat("es-PE", {

@@ -25,7 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MapPin, Plus, Edit, Trash2, Star } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MapPin, Plus, Edit, Trash2, Star, AlertCircle } from "lucide-react";
 import { getStoredUser } from "@/lib/auth";
 import {
   getAddressesApi,
@@ -38,6 +39,7 @@ import {
 import { toast } from "sonner";
 import { AddressMapPicker } from "@/components/maps/address-map-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { calculateDeliveryDistanceByCoords } from "@/lib/distance-calculator";
 
 export default function DireccionesPage() {
   const router = useRouter();
@@ -49,6 +51,12 @@ export default function DireccionesPage() {
     null,
   );
   const [deleteAddressId, setDeleteAddressId] = useState<number | null>(null);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
+  const [isCheckingDistance, setIsCheckingDistance] = useState(false);
+  const [tempCoordinates, setTempCoordinates] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     alias: "",
@@ -72,7 +80,13 @@ export default function DireccionesPage() {
   const loadAddresses = async () => {
     try {
       const data = await getAddressesApi();
-      setAddresses(data);
+      // Ordenar: predeterminada primero
+      const sorted = data.sort((a, b) => {
+        if (a.es_predeterminada && !b.es_predeterminada) return -1;
+        if (!a.es_predeterminada && b.es_predeterminada) return 1;
+        return 0;
+      });
+      setAddresses(sorted);
     } catch (error) {
       console.error("Error cargando direcciones:", error);
       toast.error("No se pudieron cargar las direcciones");
@@ -105,11 +119,37 @@ export default function DireccionesPage() {
         codigo_postal: "",
       });
     }
+    setDistanceError(null);
+    setTempCoordinates(null);
     setIsDialogOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validar distancia si hay coordenadas
+    if (tempCoordinates && !isEditing) {
+      setIsCheckingDistance(true);
+      try {
+        const result = await calculateDeliveryDistanceByCoords(
+          tempCoordinates.lat,
+          tempCoordinates.lng,
+        );
+
+        if (!result.isWithinCoverage) {
+          setDistanceError(
+            `Lo sentimos, no realizamos entregas a más de 8 km. Esta dirección está a ${result.distanceInKm.toFixed(1)} km de distancia.`,
+          );
+          setIsCheckingDistance(false);
+          return;
+        }
+      } catch (error) {
+        console.error("Error validando distancia:", error);
+        // Permitir continuar si hay error de validación
+      } finally {
+        setIsCheckingDistance(false);
+      }
+    }
 
     try {
       if (isEditing && selectedAddress) {
@@ -121,6 +161,8 @@ export default function DireccionesPage() {
       }
 
       setIsDialogOpen(false);
+      setDistanceError(null);
+      setTempCoordinates(null);
       loadAddresses();
     } catch (error) {
       console.error("Error guardando dirección:", error);
@@ -133,6 +175,9 @@ export default function DireccionesPage() {
       await setDefaultAddressApi(addressId);
       toast.success("La dirección se marcó como predeterminada");
       loadAddresses();
+
+      // Notificar al carrito que se cambió la dirección predeterminada
+      window.dispatchEvent(new CustomEvent("defaultAddressChanged"));
     } catch (error) {
       console.error("Error estableciendo dirección predeterminada:", error);
       toast.error("No se pudo establecer la dirección predeterminada");
@@ -204,6 +249,23 @@ export default function DireccionesPage() {
                   </TabsList>
 
                   <TabsContent value="map" className="space-y-4">
+                    {distanceError && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{distanceError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {isCheckingDistance && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          Validando que la dirección esté dentro de nuestra área
+                          de cobertura...
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     <AddressMapPicker
                       onAddressSelect={(address) => {
                         setFormData({
@@ -213,6 +275,15 @@ export default function DireccionesPage() {
                           ciudad: address.ciudad,
                           codigo_postal: address.codigo_postal,
                         });
+
+                        // Guardar coordenadas para validación
+                        if (address.lat && address.lng) {
+                          setTempCoordinates({
+                            lat: address.lat,
+                            lng: address.lng,
+                          });
+                          setDistanceError(null);
+                        }
                       }}
                     />
 
@@ -388,8 +459,15 @@ export default function DireccionesPage() {
                   >
                     Cancelar
                   </Button>
-                  <Button type="submit">
-                    {isEditing ? "Actualizar" : "Crear"}
+                  <Button
+                    type="submit"
+                    disabled={!!distanceError || isCheckingDistance}
+                  >
+                    {isCheckingDistance
+                      ? "Validando..."
+                      : isEditing
+                        ? "Actualizar"
+                        : "Crear"}
                   </Button>
                 </div>
               </form>
