@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Instagram, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { listCategoriesPublicApi, CategoryDto } from "@/lib/api";
+import { listCategoriesPublicApi } from "@/lib/api";
+import type { CategoryDto } from "@/lib/api";
 
 export function Footer() {
   const [categories, setCategories] = useState<CategoryDto[]>([]);

@@ -29,6 +29,7 @@ import {
   type OrderDto,
   type OrderEstadoPedido,
 } from "@/lib/api";
+import { formatCurrencyPEN, formatDateShortPE } from "@/lib/format";
 
 interface OrdersTableProps {}
 
@@ -62,22 +63,6 @@ export function OrdersTable({}: OrdersTableProps) {
       isMounted = false;
     };
   }, []);
-
-  const formatPrice = (amountString: string) => {
-    const amount = Number(amountString);
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-    }).format(Number.isNaN(amount) ? 0 : amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-PE", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   const mapUiToBackendStatus = (uiStatus: string): OrderEstadoPedido => {
     switch (uiStatus) {
@@ -348,8 +333,8 @@ export function OrdersTable({}: OrdersTableProps) {
             </p>
           </div>
         </TableCell>
-        <TableCell>{formatDate(order.fecha_creacion)}</TableCell>
-        <TableCell>{formatPrice(order.total)}</TableCell>
+        <TableCell>{formatDateShortPE(order.fecha_creacion)}</TableCell>
+        <TableCell>{formatCurrencyPEN(order.total)}</TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
             <Badge

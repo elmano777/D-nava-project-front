@@ -12,6 +12,7 @@ import {
   listOrdersApi,
   SalesStatsResponse,
 } from "@/lib/api";
+import { formatCurrencyPEN } from "@/lib/format";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -61,13 +62,6 @@ export default function AdminPage() {
 
     loadStats();
   }, [router]);
-
-  const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-    }).format(amount);
-  };
 
   if (isLoading) {
     return (
@@ -129,7 +123,7 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatPrice(parseFloat(stats?.ingresos_totales || "0"))}
+                {formatCurrencyPEN(stats?.ingresos_totales || "0")}
               </div>
             </CardContent>
           </Card>
@@ -209,7 +203,7 @@ export default function AdminPage() {
                   Ticket Promedio
                 </span>
                 <span className="font-semibold">
-                  {formatPrice(parseFloat(stats?.ticket_promedio || "0"))}
+                  {formatCurrencyPEN(stats?.ticket_promedio || "0")}
                 </span>
               </div>
               <div className="flex justify-between items-center">

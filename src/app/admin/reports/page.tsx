@@ -30,6 +30,7 @@ import {
   SalesReportResponse,
   OrderDto,
 } from "@/lib/api";
+import { formatCurrencyPEN } from "@/lib/format";
 
 interface TopProduct {
   producto_id: number;
@@ -111,13 +112,6 @@ export default function AdminReportsPage() {
 
     loadSalesReport();
   }, [period, customStartDate, customEndDate]);
-
-  const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-    }).format(amount);
-  };
 
   // Contar pedidos por estado
   const pendingOrders = orders.filter(
@@ -208,7 +202,7 @@ export default function AdminReportsPage() {
                       Ingresos del Período
                     </p>
                     <p className="text-2xl font-bold">
-                      {formatPrice(salesReport.total_ventas)}
+                      {formatCurrencyPEN(salesReport.total_ventas)}
                     </p>
                   </div>
                   <div className="border rounded-lg p-4">
@@ -224,7 +218,7 @@ export default function AdminReportsPage() {
                       Venta Promedio
                     </p>
                     <p className="text-2xl font-bold">
-                      {formatPrice(salesReport.promedio_venta)}
+                      {formatCurrencyPEN(salesReport.promedio_venta)}
                     </p>
                   </div>
                 </div>
@@ -243,7 +237,7 @@ export default function AdminReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatPrice(parseFloat(stats?.ingresos_totales || "0"))}
+                {formatCurrencyPEN(stats?.ingresos_totales || "0")}
               </div>
             </CardContent>
           </Card>
@@ -271,7 +265,7 @@ export default function AdminReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatPrice(parseFloat(stats?.ticket_promedio || "0"))}
+                {formatCurrencyPEN(stats?.ticket_promedio || "0")}
               </div>
             </CardContent>
           </Card>
@@ -317,7 +311,7 @@ export default function AdminReportsPage() {
                     Ingresos por Pedido
                   </span>
                   <span className="font-bold">
-                    {formatPrice(parseFloat(stats?.ticket_promedio || "0"))}
+                    {formatCurrencyPEN(stats?.ticket_promedio || "0")}
                   </span>
                 </div>
               </div>
@@ -370,7 +364,7 @@ export default function AdminReportsPage() {
                         {product.cantidad_vendida} unidades
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatPrice(Number(product.total_ingresos))}
+                        {formatCurrencyPEN(product.total_ingresos)}
                       </p>
                     </div>
                   </div>
@@ -414,7 +408,7 @@ export default function AdminReportsPage() {
                         {product.cantidad_vendida} unidades vendidas
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Ingresos: {formatPrice(Number(product.total_ingresos))}
+                        Ingresos: {formatCurrencyPEN(product.total_ingresos)}
                       </p>
                     </div>
                   </div>

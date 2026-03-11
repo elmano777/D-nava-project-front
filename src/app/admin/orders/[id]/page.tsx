@@ -37,6 +37,7 @@ import {
   OrderEstadoPedido,
 } from "@/lib/api";
 import Link from "next/link";
+import { formatCurrencyPEN, formatDateTimeLongPE } from "@/lib/format";
 
 interface OrderHistorialDto {
   historial_id: number;
@@ -182,24 +183,6 @@ export default function AdminOrderDetailPage() {
     }
   };
 
-  const formatPrice = (price: string | number) => {
-    const amount = typeof price === "string" ? parseFloat(price) : price;
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-PE", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -295,7 +278,7 @@ export default function AdminOrderDetailPage() {
                           <p className="font-medium">{item.nombre_producto}</p>
                           <p className="text-sm text-muted-foreground">
                             {item.cantidad} x{" "}
-                            {formatPrice(item.precio_unitario)}
+                            {formatCurrencyPEN(item.precio_unitario)}
                           </p>
                           {item.personalizacion && (
                             <p className="text-sm text-muted-foreground italic">
@@ -304,7 +287,7 @@ export default function AdminOrderDetailPage() {
                           )}
                         </div>
                         <p className="font-semibold">
-                          {formatPrice(item.subtotal)}
+                          {formatCurrencyPEN(item.subtotal)}
                         </p>
                       </div>
                     ))}
@@ -313,7 +296,7 @@ export default function AdminOrderDetailPage() {
                       <div className="flex justify-between pt-2">
                         <span className="text-muted-foreground">Subtotal</span>
                         <span className="font-medium">
-                          {formatPrice(order.subtotal)}
+                          {formatCurrencyPEN(order.subtotal)}
                         </span>
                       </div>
                       {order.tipo_entrega === "delivery" &&
@@ -324,7 +307,7 @@ export default function AdminOrderDetailPage() {
                               Delivery
                             </span>
                             <span className="font-medium">
-                              {formatPrice(
+                              {formatCurrencyPEN(
                                 String(
                                   parseFloat(order.total) -
                                     parseFloat(order.subtotal),
@@ -336,7 +319,7 @@ export default function AdminOrderDetailPage() {
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total</span>
                         <span className="text-primary">
-                          {formatPrice(order.total)}
+                          {formatCurrencyPEN(order.total)}
                         </span>
                       </div>
                     </div>
@@ -373,7 +356,7 @@ export default function AdminOrderDetailPage() {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              {formatDate(h.fecha_cambio)}
+                              {formatDateTimeLongPE(h.fecha_cambio)}
                             </p>
                           </div>
                         </div>
@@ -530,12 +513,14 @@ export default function AdminOrderDetailPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Creado</span>
-                    <span>{formatDate(order.fecha_creacion)}</span>
+                    <span>{formatDateTimeLongPE(order.fecha_creacion)}</span>
                   </div>
                   {order.fecha_actualizacion && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Actualizado</span>
-                      <span>{formatDate(order.fecha_actualizacion)}</span>
+                      <span>
+                        {formatDateTimeLongPE(order.fecha_actualizacion)}
+                      </span>
                     </div>
                   )}
                 </CardContent>
