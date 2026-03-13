@@ -17,21 +17,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+type NavbarUser = {
+  nombre_completo: string;
+  rol: string;
+} | null;
+
 export function Navbar() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<{
-    nombre_completo: string;
-    rol: string;
-  } | null>(null);
+  const [user, setUser] = useState<NavbarUser>(() => getStoredUser());
 
   useEffect(() => {
-    // Verificar si hay un usuario logueado al montar
-    const storedUser = getStoredUser();
-    if (storedUser) {
-      setUser(storedUser);
-    }
-
     // Escuchar cambios en localStorage desde otras pestañas
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "backend_user") {

@@ -1,15 +1,16 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccessToken } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 
-export default function ClienteLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+interface ClienteLayoutProps {
+  children: ReactNode;
+}
+
+export default function ClienteLayout({ children }: ClienteLayoutProps) {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
 
@@ -17,9 +18,10 @@ export default function ClienteLayout({
     const token = getAccessToken();
     if (!token) {
       router.replace("/auth/login");
-    } else {
-      setIsChecking(false);
+      return;
     }
+
+    setIsChecking(false);
   }, [router]);
 
   if (isChecking) {

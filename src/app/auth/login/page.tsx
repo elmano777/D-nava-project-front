@@ -38,10 +38,10 @@ export default function LoginPage() {
 
       // Validar que la respuesta tenga la estructura esperada
       if (!authResponse.user) {
-        console.error("Respuesta del login:", authResponse);
-        throw new Error(
-          "Respuesta del servidor inválida: falta información del usuario",
+        setError(
+          "Ocurrió un problema al procesar la respuesta del servidor. Intenta nuevamente.",
         );
+        return;
       }
 
       // Guardar tokens y datos del usuario en localStorage

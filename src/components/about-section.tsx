@@ -1,6 +1,13 @@
 import { Sparkles, Heart, Award } from "lucide-react";
 
-const values = [
+type AboutValue = {
+  number: string;
+  icon: typeof Heart;
+  title: string;
+  description: string;
+};
+
+const values: AboutValue[] = [
   {
     number: "01",
     icon: Heart,

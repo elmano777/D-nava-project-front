@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Edit } from "lucide-react";
 import Link from "next/link";
+import { formatCurrencyPEN } from "@/lib/format";
 
 interface Product {
   producto_id: number;
@@ -34,13 +35,6 @@ export function ProductsTable({
   products,
   onToggleDisponible,
 }: ProductsTableProps) {
-  const formatPrice = (precio: string) => {
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-    }).format(parseFloat(precio));
-  };
-
   return (
     <div className="rounded-md border">
       <Table>
@@ -71,7 +65,7 @@ export function ProductsTable({
                 <TableCell className="max-w-xs truncate">
                   {product.descripcion_breve || "-"}
                 </TableCell>
-                <TableCell>{formatPrice(product.precio_base)}</TableCell>
+                <TableCell>{formatCurrencyPEN(product.precio_base)}</TableCell>
                 <TableCell>
                   {product.control_stock
                     ? (product.stock_actual ?? 0)

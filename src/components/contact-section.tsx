@@ -1,7 +1,18 @@
-import { Phone, Mail, MapPin, MessageCircle, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Phone, Mail, MapPin, Clock } from "lucide-react";
 
-const contactInfo = [
+type ContactInfoItem = {
+  icon: typeof Phone;
+  label: string;
+  value: string;
+  link?: string;
+};
+
+type ScheduleItem = {
+  day: string;
+  hours: string;
+};
+
+const contactInfo: ContactInfoItem[] = [
   {
     icon: Phone,
     label: "Teléfono",
@@ -21,7 +32,7 @@ const contactInfo = [
   },
 ];
 
-const schedule = [
+const schedule: ScheduleItem[] = [
   { day: "Lunes - Viernes", hours: "7:00 AM - 8:00 PM" },
   { day: "Sábados", hours: "8:00 AM - 9:00 PM" },
   { day: "Domingos", hours: "9:00 AM - 6:00 PM" },
@@ -73,13 +84,7 @@ export function ContactSection() {
               })}
             </div>
 
-            <div className="pt-6">
-              <Button
-                size="lg"
-                className="text-base px-8 py-6 h-auto w-full sm:w-auto gap-2"
-                asChild
-              ></Button>
-            </div>
+            <div className="pt-6" />
           </div>
 
           {/* Horario */}

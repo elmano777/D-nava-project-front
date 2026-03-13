@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,24 @@ import {
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { clearAuthData, getStoredUser } from "@/lib/auth";
-import { AuthUser, getProfileApi, ProfileResponse } from "@/lib/api";
+import { getProfileApi } from "@/lib/api";
+import type { AuthUser, ProfileResponse } from "@/lib/api";
 import { ShoppingCartCliente } from "@/components/cliente/shopping-cart-cliente";
 
 export function ClienteNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => getStoredUser());
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const data = await getProfileApi();
+      setProfile(data);
+    } catch (error) {
+      console.error("Error al cargar perfil:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const currentUser = getStoredUser();
@@ -30,7 +40,6 @@ export function ClienteNav() {
 
     // Verificar que sea un cliente
     if (currentUser && currentUser.rol !== "cliente") {
-      // Si no es cliente, redirigir
       clearAuthData();
       router.replace("/auth/login");
       return;
@@ -38,13 +47,11 @@ export function ClienteNav() {
 
     loadProfile();
 
-    // Escuchar cambios en localStorage desde otras pestañas
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "backend_user") {
         if (e.newValue) {
           try {
             const newUser = JSON.parse(e.newValue);
-            // Si cambió de usuario o rol, redirigir
             if (
               newUser.rol !== "cliente" ||
               newUser.usuario_id !== currentUser?.usuario_id
@@ -55,7 +62,6 @@ export function ClienteNav() {
             console.error("Error parsing user data:", error);
           }
         } else {
-          // Usuario cerró sesión
           window.location.href = "/";
         }
       }
@@ -66,16 +72,7 @@ export function ClienteNav() {
     return () => {
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const data = await getProfileApi();
-      setProfile(data);
-    } catch (error) {
-      console.error("Error al cargar perfil:", error);
-    }
-  };
+  }, [router, loadProfile]);
 
   const handleLogout = () => {
     clearAuthData();
