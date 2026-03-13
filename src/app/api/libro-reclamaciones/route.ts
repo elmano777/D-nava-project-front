@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const DESTINATARIO = "dnavapasteleria@gmail.com";
 const REMITENTE = "Libro de Reclamaciones <reclamaciones@mail.dnava-api.com>";
+
+/** Cliente Resend solo cuando hace falta y hay API key (evita fallo en build). */
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    throw new Error("RESEND_API_KEY no está configurada. Añádela en .env.local o en las variables de entorno.");
+  }
+  return new Resend(key);
+}
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+    const resend = getResend();
 
     const fecha = new Date().toLocaleString("es-PE", {
       timeZone: "America/Lima",
