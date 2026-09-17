@@ -6,7 +6,9 @@ interface HealthStatus {
   isChecking: boolean;
 }
 
-const HEALTH_CHECK_URL = 'https://api.dnava-api.com/health';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+const HEALTH_CHECK_URL = `${API_BASE_URL}/health`;
 const POLLING_INTERVAL = 15000; // 15 segundos durante mantenimiento
 
 export const useHealthCheck = () => {
